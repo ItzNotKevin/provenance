@@ -56,7 +56,7 @@ embeddings → extension → edit lineage → geohash → amber.
   browser; see `backend/README.md` "Fee payer: needs manual funding". This is the last step
   before a real end-to-end tx can be sent (Rung 4).
 - [ ] Retry logic on submit
-- [ ] `/lookup/:sha256` — GREEN tier direct PDA read (no DB needed per lib/CLAUDE.md — pure
+- [x] `/lookup/:sha256` — GREEN tier direct PDA read (no DB needed per lib/CLAUDE.md — pure
   chain read)
 - [ ] pHash-at-ingest (needs image bytes uploaded, not just the manifest) + index
   `{sha256, phash, chain_address, timestamp, device, parent_hash}` into Mongo
@@ -82,7 +82,7 @@ embeddings → extension → edit lineage → geohash → amber.
 
 ### Rung 10 — Threaded to the end
 - [x] Test suite scaffolding: `npm test` (TS: pHash + signing contract) + `npm run test:all` (adds Rust); pre-push hook + GitHub Actions CI — all offline, $0
-  - [ ] **Expand coverage as we build** (current suite only covers pHash + signing): backend `/verify` tiers + chain-confirmation, de-stubbed `lib/registry.ts`, new program instructions (edit lineage), extension. Add tests in the same change as each feature.
+  - [ ] **Expand coverage as we build** (current suite covers pHash, signing, and backend GREEN lookup): backend `/verify` tiers + chain-confirmation, de-stubbed `lib/registry.ts`, new program instructions (edit lineage), extension. Add tests in the same change as each feature.
 - [ ] Demo-proofing: HEIC / large files / malformed input / graceful no-match / RPC fallback / loading states (judges WILL try to break it)
 - [ ] Pitch script written + rehearsed (2 people: one drives, one narrates)
 - [ ] Venue Wi-Fi contingency (RPC retry + cached fallback)

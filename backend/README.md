@@ -10,14 +10,17 @@ Validates a device-signed capture manifest, co-signs as **fee payer**, and submi
 - ✅ `POST /attest` — validates the Ed25519 signature over the canonical manifest bytes, then
   builds and submits the same 2-instruction transaction as `program/tests/smoke.ts` (Ed25519
   precompile verify + `attest_photo`).
+- ✅ `GET /lookup/:sha256` — derives the photo PDA and reads the program-owned account directly
+  from devnet. Returns GREEN with decoded chain data, or GREY/404 when the PDA does not exist.
+  This read needs neither MongoDB nor a fee-payer key.
 - ✅ Verified against the real deployed devnet program via `scripts/dry-run.ts`
   (`simulateTransaction`, no funds required) — IDL loads, PDA derivation matches, canonical
   message bytes match the on-chain program, signature validates. The only failure is
   `AccountNotFound` for the fee payer, because it's unfunded (see below).
 - ❌ **Not yet submitted a real transaction** — needs a funded fee-payer wallet (blocked, see
   below) and a non-rate-limited RPC endpoint for sustained use (ROADMAP Rung 1).
-- ❌ No Mongo indexing, no `/lookup` (GREEN tier chain read), no `/verify` three-tier endpoint,
-  no pHash-at-ingest yet. Those are the rest of ROADMAP Rung 6 — this only covers `attestPhoto`.
+- ❌ No Mongo indexing, no `/verify` three-tier endpoint, and no pHash-at-ingest yet.
+  Those are the remaining ROADMAP Rung 6 items.
 
 ## Fee payer: needs manual funding
 
@@ -43,7 +46,9 @@ endpoint used by default (`https://api.devnet.solana.com`) rate-limits under loa
 ```bash
 cd backend
 npm install
-npm start                              # POST /attest on :8787, GET /health
+npm start                              # API on :8787
+npm run typecheck                      # strict TypeScript check
+npm test                               # offline chain + HTTP unit tests
 ```
 
 Env vars (all optional):
@@ -63,6 +68,16 @@ FEE_PAYER_KEYPAIR_PATH=./devnet-fee-payer.json npm start
 
 Requires `program/target/idl/provenance.json` to exist — generate it with
 `cd program && ./build.sh` (see `program/README.md`; do **not** use `anchor build`).
+
+Read-only lookup does not require the IDL or a fee-payer key:
+
+```bash
+curl http://localhost:8787/lookup/<64-character-sha256>
+```
+
+- `200 { "tier": "green", "record": ... }` when the program-owned PDA exists.
+- `404 { "tier": "grey", "sha256": ... }` when it does not exist.
+- `400` for a malformed SHA-256 and `502` when the Solana RPC is unavailable or returns invalid data.
 
 ## Sanity-check without spending SOL
 
