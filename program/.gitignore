@@ -1,0 +1,9 @@
+# Rust / Anchor build artifacts (incl. the program keypair under target/deploy/)
+/target
+
+# test-client deps
+node_modules/
+
+# local validator ledger
+.anchor/
+test-ledger/

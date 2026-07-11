@@ -1,0 +1,13 @@
+{
+  "name": "provenance-program",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Anchor client + tests for the Provenance Camera on-chain program",
+  "scripts": {
+    "smoke": "node tests/smoke.ts"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "0.30.1",
+    "tweetnacl": "^1.0.3"
+  }
+}
