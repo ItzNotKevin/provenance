@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import * as Crypto from "expo-crypto";
+import { BACKEND_URL, USE_FAKE_REGISTRY } from "./config";
 
 export type VerdictTier = "green" | "amber" | "grey";
 
@@ -81,22 +82,42 @@ export interface CaptureManifest {
 }
 
 /**
- * Submits a signed capture manifest for on-chain anchoring.
- * TODO: real chain call — replace with a Solana transaction that writes
- * the manifest + signature into a new attestation account.
+ * Submits a signed capture manifest for on-chain anchoring. Real path: POSTs to the backend
+ * (see backend/src/server.ts), which validates the signature, co-signs as fee payer, and
+ * submits attest_photo to devnet. Falls back to a fake tx when USE_FAKE_REGISTRY is set
+ * (see lib/config.ts) — e.g. if the backend isn't running or venue Wi-Fi dies mid-demo.
  */
 export async function attestPhoto(
   manifest: CaptureManifest,
   signature: string
 ): Promise<{ txSignature: string; explorerUrl: string }> {
-  await new Promise((resolve) => setTimeout(resolve, 2000));
+  if (USE_FAKE_REGISTRY) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
-  const seed = manifest.sha256 + signature;
-  const txSignature = truncateKey(seed.slice(0, 20) + seed.slice(-20));
-  return {
-    txSignature,
-    explorerUrl: `https://explorer.solana.com/tx/${seed.slice(0, 32)}`,
-  };
+    const seed = manifest.sha256 + signature;
+    const txSignature = truncateKey(seed.slice(0, 20) + seed.slice(-20));
+    return {
+      txSignature,
+      explorerUrl: `https://explorer.solana.com/tx/${seed.slice(0, 32)}`,
+    };
+  }
+
+  const unixSeconds = Math.floor(new Date(manifest.timestamp).getTime() / 1000);
+  const response = await fetch(`${BACKEND_URL}/attest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sha256: manifest.sha256,
+      timestamp: unixSeconds,
+      devicePubkey: manifest.devicePubkey,
+      signature,
+    }),
+  });
+  const body = await response.json();
+  if (!response.ok) {
+    throw new Error(body.error ?? `attest failed: HTTP ${response.status}`);
+  }
+  return { txSignature: body.txSignature, explorerUrl: body.explorerUrl };
 }
 
 /**
