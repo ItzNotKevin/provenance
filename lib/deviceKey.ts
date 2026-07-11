@@ -33,7 +33,7 @@ function bytesToHex(bytes: Uint8Array): string {
 const BASE64_CHARS =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-function bytesToBase64(bytes: Uint8Array): string {
+export function bytesToBase64(bytes: Uint8Array): string {
   let result = "";
   for (let i = 0; i < bytes.length; i += 3) {
     const b0 = bytes[i];

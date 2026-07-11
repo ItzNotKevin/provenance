@@ -76,10 +76,17 @@ export interface CaptureManifest {
  * (see backend/src/server.ts), which validates the signature, co-signs as fee payer, and
  * submits attest_photo to devnet. Falls back to a fake tx when USE_FAKE_REGISTRY is set
  * (see lib/config.ts) — e.g. if the backend isn't running or venue Wi-Fi dies mid-demo.
+ *
+ * `imageBytes`, if provided, is the exact captured photo (the same bytes `sha256` was computed
+ * over) — the backend re-hashes it to confirm that before computing anything from it, then
+ * derives the real pHash and bakes it into the immutable on-chain record at creation (see
+ * lib/CLAUDE.md's pHash-at-ingest decision). Omit it and the attestation still succeeds, just
+ * without a real pHash (AMBER tier evidence for that photo won't be findable later).
  */
 export async function attestPhoto(
   manifest: CaptureManifest,
-  signature: string
+  signature: string,
+  imageBytes?: Uint8Array
 ): Promise<{ txSignature: string; explorerUrl: string }> {
   if (USE_FAKE_REGISTRY) {
     await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -93,6 +100,7 @@ export async function attestPhoto(
   }
 
   const unixSeconds = Math.floor(new Date(manifest.timestamp).getTime() / 1000);
+  const { bytesToBase64 } = await import("@/lib/deviceKey");
   const response = await fetch(`${BACKEND_URL}/attest`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -101,6 +109,7 @@ export async function attestPhoto(
       timestamp: unixSeconds,
       devicePubkey: manifest.devicePubkey,
       signature,
+      imageBase64: imageBytes ? bytesToBase64(imageBytes) : undefined,
     }),
   });
   const body = await response.json();
@@ -110,12 +119,40 @@ export async function attestPhoto(
   return { txSignature: body.txSignature, explorerUrl: body.explorerUrl };
 }
 
+interface RecentAttestationDocument {
+  sha256: string;
+  device: string;
+  timestamp: number;
+  txSignature: string | null;
+  explorerUrl: string;
+}
+
 /**
- * Returns recent attestations for the registry list view.
- * TODO: real chain call — replace with a paginated query against the
- * on-chain attestation program (e.g. getProgramAccounts filtered by owner).
+ * Returns recent attestations for the registry list view. Real path: GET {BACKEND_URL}/recent,
+ * a paginated read of the Mongo mirror (itself fully rebuildable from the chain — see
+ * backend/scripts/reindex.ts). Every field traces back to a chain-confirmed read at index
+ * time (see lib/CLAUDE.md's iron rule). Falls back to fake data when USE_FAKE_REGISTRY is set.
  */
 export async function recentAttestations(): Promise<AttestationRecord[]> {
+  if (!USE_FAKE_REGISTRY) {
+    const { formatUnixSeconds } = await import("@/lib/solana");
+    const { CLUSTER_QUERY } = await import("@/lib/solanaConfig");
+    const response = await fetch(`${BACKEND_URL}/recent`);
+    const body = await response.json();
+    if (!response.ok) {
+      throw new Error(body.error ?? `recent failed: HTTP ${response.status}`);
+    }
+    return (body.records as RecentAttestationDocument[]).map((doc) => ({
+      sha256: doc.sha256,
+      capturedAt: formatUnixSeconds(doc.timestamp),
+      devicePubkey: truncateKey(doc.device),
+      txSignature: doc.txSignature ? truncateKey(doc.txSignature) : "unknown",
+      explorerUrl: doc.txSignature
+        ? `https://explorer.solana.com/tx/${doc.txSignature}${CLUSTER_QUERY}`
+        : doc.explorerUrl,
+    }));
+  }
+
   await new Promise((resolve) => setTimeout(resolve, 400));
 
   return [

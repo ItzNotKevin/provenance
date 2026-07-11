@@ -51,19 +51,60 @@ embeddings → extension → edit lineage → geohash → amber.
   canonical manifest, then submits the real 2-ix devnet tx (see `backend/README.md`)
 - [x] Verified against the live deployed program via `backend/scripts/dry-run.ts`
   (`simulateTransaction`, no funds needed) — IDL, PDA seeds, message layout all correct
-- [ ] **Blocked: fund the fee-payer wallet** (`9eeGRkoPDGQEryN2iEbswsPDcRtqLGx2F1WiGXBny46h`) —
-  public devnet airdrop RPC is rate-limited and `faucet.solana.com` needs a captcha solved in a
-  browser; see `backend/README.md` "Fee payer: needs manual funding". This is the last step
-  before a real end-to-end tx can be sent (Rung 4).
+- [x] **Fee payer funded:** the *local* default (`~/.config/solana/id.json` = `FNY6avv7…m3tA`,
+  `backend/src/config.ts`'s fallback) has ~6.1 SOL on devnet — plenty for the demo. (The
+  `9eeGRko…46h` wallet named in `backend/README.md`'s "needs manual funding" section is a
+  *different*, stale throwaway key from another machine — not what this backend actually
+  loads; README could use a follow-up correction.)
 - [ ] Retry logic on submit
-- [ ] `/lookup/:sha256` — GREEN tier direct PDA read (no DB needed per lib/CLAUDE.md — pure
-  chain read)
-- [ ] pHash-at-ingest (needs image bytes uploaded, not just the manifest) + index
-  `{sha256, phash, chain_address, timestamp, device, parent_hash}` into Mongo
-- [ ] `/verify` with all three tiers + **chain-confirmation baked in from the start**
-- [ ] Reindex script: rebuild Mongo by scanning on-chain accounts
-- [x] **Wire the app:** `attestPhoto` in `lib/registry.ts` now calls the backend behind
-  `EXPO_PUBLIC_USE_FAKE_REGISTRY` (see [../lib/config.ts](../lib/config.ts)); `lookupHash` and
+- [x] `/lookup/:sha256` — GREEN tier direct PDA read (no DB, no fee payer — pure chain read;
+  `backend/src/chain.ts` → `lookupAttestation`, route in `backend/src/server.ts`). Returns
+  `{tier:"green",record}` or `{tier:"grey"}`; verified live against devnet + offline decode tests.
+  (Note: the *app's* `lookupHash` already reads the chain client-side via `lib/solana.ts`; this
+  server endpoint is for the web verifier / extension and is the base for `/verify` amber.)
+- [x] Mongo indexing — `backend/src/mongo.ts`. Write-through on every successful `/attest`
+  (`indexAfterAttest` in `backend/src/server.ts` re-reads the just-confirmed PDA via
+  `lookupAttestation` before indexing, so every doc traces to a confirmed chain read — never
+  trusts the write-path input directly). Schema: `{sha256, phash, chainAddress, timestamp,
+  device, parentHash, slot, txSignature, explorerUrl, indexedAt}`, upserted by `sha256`.
+  Non-fatal on Mongo failure (chain write already succeeded — Mongo is disposable). Verified
+  live against the real Atlas cluster + real devnet accounts.
+- [x] **pHash-at-ingest.** `POST /attest` accepts an optional `imageBase64` field — the exact
+  bytes the device hashed/signed. `computeImagePhash` (`backend/src/server.ts`) re-hashes the
+  upload and **rejects it (400) if it doesn't match the already-signed sha256** (the binding
+  that ties pHash back to the attested photo despite pHash never being part of the signed
+  message), then `computePhashFromImageBytes` (`backend/src/imagePhash.ts`, via `sharp`) computes
+  the real pHash, baked into the immutable on-chain record at creation (no "update" instruction
+  exists). `lib/registry.ts`'s `attestPhoto` gained an optional `imageBytes` param;
+  `app/(tabs)/capture.tsx` passes the already-loaded photo bytes. 30MB body-size cap
+  (demo-proofing). Live-tested end to end on real devnet + real Atlas: attested a real image
+  (on-chain `phash` came back non-zero), a never-attested recompressed derivative correctly
+  AMBER-matched to it, a tampered upload was rejected, a genuinely unrelated image returned GREY.
+- [x] **AMBER matching (Atlas Vector Search + Hamming distance)** — `backend/src/phashVector.ts`
+  encodes each 16-char hex pHash as a 64-dim `±1` vector (squared Euclidean distance = 4 ×
+  Hamming distance, proved in `tests/phashVector.test.ts`), indexed via a real Atlas Vector
+  Search index (`npm run create-vector-index`; confirmed working on the M0 free tier).
+  `findAmberCandidates` in `backend/src/mongo.ts` runs `$vectorSearch` for fast ANN
+  candidate-narrowing, then re-derives the *exact* Hamming distance for the real filter/sort
+  (ANN is a speed optimization only), falling back to a full scan if the index isn't ready.
+  `AMBER_HAMMING_THRESHOLD = 10` is a conservative placeholder pending the real Rung 2
+  experiment.
+- [x] **`/verify` with all three tiers + chain-confirmation baked in from the start** —
+  `backend/src/server.ts` `handleVerify`: GREEN (exact chain read) → AMBER (`findAmberCandidates`,
+  each candidate re-read from the chain via `lookupAttestation` before being returned — a
+  Mongo-only match is never trusted, tries the next candidate if one fails to confirm) → GREY.
+  Live-verified end-to-end against the real Atlas cluster + real devnet data, both with
+  synthetic vectors and with a real attested image matched against a real recompressed
+  derivative (see pHash-at-ingest above) — `{tier:"amber", hammingDistance:0-3,
+  record:{...chain-confirmed...}}`.
+- [x] Reindex script: `backend/scripts/reindex.ts` (`npm run reindex`) — scans
+  `getProgramAccounts`, decodes every `PhotoAttestation`, upserts into Mongo. Makes "the index
+  is fully rebuildable from the chain" literally true; verified against the 2 real devnet
+  accounts.
+- [x] **Wire the app:** `attestPhoto` and `recentAttestations` in `lib/registry.ts` now call the
+  backend behind `EXPO_PUBLIC_USE_FAKE_REGISTRY` (see [../lib/config.ts](../lib/config.ts));
+  `recentAttestations` hits `GET /recent` (the Mongo mirror) and maps documents back to the
+  exact `AttestationRecord` shape the UI already expects — zero UI changes needed. `lookupHash`
   `recentAttestations` are still the original stubs — see [../lib/CLAUDE.md](../lib/CLAUDE.md)
 
 ### Rung 7 — Verifier in tier order

@@ -93,7 +93,7 @@ function NativeCapture() {
       const signature = await signManifest(manifestBytes);
       setChecklistStep(2);
 
-      const { txSignature, explorerUrl } = await attestPhoto(manifest, signature);
+      const { txSignature, explorerUrl } = await attestPhoto(manifest, signature, bytes);
       setAnchorResult({
         txSignature,
         explorerUrl,

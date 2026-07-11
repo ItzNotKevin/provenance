@@ -78,6 +78,21 @@ produce a false "verified." Rationale: Expo native has no cheap raw-pixel API (w
 `expo-image-manipulator` + a JS image decoder). **v2 upgrade:** compute + sign pHash on-device once
 native pixel readback is solved, then add `phash` to `CaptureManifest` **and** the signed bytes.
 
+**✅ Built and live-verified (2026-07-11):** `attestPhoto` in `lib/registry.ts` now accepts an
+optional third argument, `imageBytes` — `capture.tsx` passes it the exact bytes `sha256Bytes`
+already hashed. It's base64'd and sent as `imageBase64` in the `/attest` POST. The backend
+(`backend/src/server.ts` → `computeImagePhash`) **re-hashes the uploaded bytes and rejects the
+request if they don't match the already-signed `sha256`** — that's what ties the pHash back to
+the cryptographically-attested photo even though the pHash itself is never part of the signed
+message — then decodes via `sharp` (`backend/src/imagePhash.ts`) and bakes the real pHash into
+the immutable on-chain record at creation (there's no "update pHash" instruction, so it has to
+happen before submission). Live-tested end to end on real devnet + real Atlas: attested a real
+image (on-chain `phash` came back non-zero, e.g. `9a7fff7fffffffff`), then a never-attested
+recompressed derivative correctly matched it via `POST /verify`
+(`{tier:"amber", hammingDistance:0, record:{...chain-confirmed...}}`), and a genuinely unrelated
+image correctly returned `{tier:"grey"}`. `imageBytes` is optional — omitting it still attests
+successfully, just with no findable AMBER evidence for that photo.
+
 ## Types you must not casually change (the whole UI depends on them)
 
 ```ts

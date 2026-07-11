@@ -5,12 +5,16 @@
   "description": "Backend for Provenance Camera: validates signed capture manifests, co-signs as fee payer, submits attest_photo to devnet.",
   "type": "module",
   "scripts": {
-    "dev": "node --watch src/server.ts",
-    "start": "node src/server.ts",
-    "test": "node --test tests/*.test.ts"
+    "dev": "node --env-file-if-exists=.env --watch src/server.ts",
+    "start": "node --env-file-if-exists=.env src/server.ts",
+    "test": "node --test tests/*.test.ts",
+    "reindex": "node --env-file-if-exists=.env scripts/reindex.ts",
+    "create-vector-index": "node --env-file-if-exists=.env scripts/create-vector-index.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "0.30.1",
+    "mongodb": "^7.5.0",
+    "sharp": "^0.35.3",
     "tweetnacl": "^1.0.3"
   }
 }

@@ -8,6 +8,10 @@ const { Keypair } = web3;
 export const RPC_URL = process.env.SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
 export const PORT = Number(process.env.PORT ?? 8787);
 
+/** Atlas connection string — the search index (Rung 6). Undefined disables Mongo entirely;
+ *  /attest and /lookup keep working (chain is the source of truth), only /recent degrades. */
+export const MONGODB_URI = process.env.MONGODB_URI;
+
 /**
  * Loads the fee-payer keypair, in priority order:
  *   1. FEE_PAYER_SECRET_KEY — JSON array of 64 bytes (same shape as a solana-keygen id.json)
