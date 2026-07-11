@@ -41,13 +41,13 @@ function TabBar({ state, descriptors, navigation }: any) {
             }`}
             style={
               isFocused
-                ? { borderTopWidth: 2, borderTopColor: "#ffffff" }
+                ? { borderTopWidth: 2, borderTopColor: "#c4b5fd" }
                 : { borderTopWidth: 2, borderTopColor: "transparent" }
             }
           >
             <Text
               className={`text-[18px] mb-1 ${
-                isFocused ? "text-primary" : "text-on-surface-variant"
+                isFocused ? "text-accent" : "text-on-surface-variant"
               }`}
             >
               {TAB_ICON[route.name]}

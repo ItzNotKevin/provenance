@@ -29,7 +29,7 @@ function WebFallback() {
   return (
     <View className="flex-1 items-center justify-center bg-background px-8">
       <RegistrationFrame className="border border-hairline bg-surface p-8 items-center gap-4">
-        <Text className="text-primary text-[32px]">◇</Text>
+        <Text className="text-accent-red text-[32px]">◇</Text>
         <Text className="font-mono-bold text-lg text-primary uppercase text-center tracking-widest">
           CAPTURE REQUIRES{"\n"}THE DEVICE APP
         </Text>

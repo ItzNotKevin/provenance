@@ -10,6 +10,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import RegistrationFrame from "@/components/RegistrationFrame";
 import VerdictView from "@/components/VerdictView";
+import SolanaStatusStub from "@/components/SolanaStatusStub";
 import { PrimaryButton, GhostButton } from "@/components/Buttons";
 import { sha256Bytes, lookupHash, type Verdict } from "@/lib/registry";
 
@@ -150,6 +151,10 @@ export default function VerifyScreen() {
               VERIFICATION IS READ-ONLY · CAPTURE SIGNS WITH THIS DEVICE&apos;S KEY
             </Text>
           </View>
+
+          <View className="items-center">
+            <SolanaStatusStub />
+          </View>
         </>
       )}
 
@@ -165,14 +170,14 @@ export default function VerifyScreen() {
 
           <View className="border border-hairline bg-surface p-4 gap-4">
             <View className="flex-row items-center gap-3">
-              <ActivityIndicator color="#ffffff" />
+              <ActivityIndicator color="#c4b5fd" />
               <Text className="font-mono text-xs text-primary uppercase tracking-widest">
                 {STEPS[stepIndex]}
               </Text>
             </View>
             <View className="w-full h-[2px] bg-surface-container-high">
               <View
-                className="h-full bg-primary"
+                className="h-full bg-accent"
                 style={{ width: `${((stepIndex + 1) / STEPS.length) * 100}%` }}
               />
             </View>
