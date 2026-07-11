@@ -36,6 +36,8 @@ export default function RegistryScreen() {
           onChangeText={setQuery}
           placeholder="LOOK UP BY HASH OR DEVICE..."
           placeholderTextColor="#8e9192"
+          cursorColor="#c4b5fd"
+          selectionColor="#c4b5fd"
           autoCapitalize="characters"
           autoCorrect={false}
           className="w-full border-b border-hairline px-1 py-3 font-mono text-xs text-primary uppercase"
@@ -44,7 +46,7 @@ export default function RegistryScreen() {
 
       {!records ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#ffffff" />
+          <ActivityIndicator color="#c4b5fd" />
         </View>
       ) : (
         <FlatList

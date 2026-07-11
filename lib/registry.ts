@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import * as Crypto from "expo-crypto";
+import { BACKEND_URL, USE_FAKE_REGISTRY } from "./config";
 
 export type VerdictTier = "green" | "amber" | "grey";
 
@@ -42,36 +43,71 @@ export async function sha256Bytes(bytes: Uint8Array): Promise<string> {
   return bytesToHex(new Uint8Array(digest));
 }
 
+function truncateKey(hex: string): string {
+  return `${hex.slice(0, 4)}…${hex.slice(-4)}`;
+}
+
 /**
  * Looks up a hash in the attestation registry: a real devnet read of the
- * content-addressed PDA (see lib/solana.ts, program/README.md). GREEN if the
- * PDA exists, GREY if it doesn't. AMBER (pHash backend match) isn't wired yet —
- * that needs the Mongo-backed matching described in lib/CLAUDE.md.
+ * content-addressed PDA (see lib/solana.ts, program/README.md) — no database,
+ * the address is derived from the hash. GREEN if the PDA exists, GREY if it
+ * doesn't or the RPC is unreachable (never a false positive). AMBER (pHash
+ * backend match) isn't wired yet — that needs the Mongo-backed matching
+ * described in lib/CLAUDE.md.
  */
 export async function lookupHash(hash: string): Promise<Verdict> {
-  const { realLookupHash } = await import("@/lib/solana");
-  return realLookupHash(hash);
+  try {
+    const { realLookupHash } = await import("@/lib/solana");
+    return await realLookupHash(hash);
+  } catch (err) {
+    console.warn("lookupHash: chain read failed, reporting grey", err);
+    return { tier: "grey" };
+  }
 }
 
 export interface CaptureManifest {
   sha256: string;
-  /** Unix seconds — must match the canonical signed message exactly. */
-  timestamp: number;
+  timestamp: string;
   devicePubkey: string;
 }
 
 /**
- * Submits a signed capture manifest as a real devnet transaction: a native
- * Ed25519 verify instruction (over the canonical bytes the device signed) plus
- * attest_photo, which introspects that verify and creates the PDA. See
- * lib/solana.ts and program/README.md.
+ * Submits a signed capture manifest for on-chain anchoring. Real path: POSTs to the backend
+ * (see backend/src/server.ts), which validates the signature, co-signs as fee payer, and
+ * submits attest_photo to devnet. Falls back to a fake tx when USE_FAKE_REGISTRY is set
+ * (see lib/config.ts) — e.g. if the backend isn't running or venue Wi-Fi dies mid-demo.
  */
 export async function attestPhoto(
   manifest: CaptureManifest,
   signature: string
 ): Promise<{ txSignature: string; explorerUrl: string }> {
-  const { realAttestPhoto } = await import("@/lib/solana");
-  return realAttestPhoto(manifest, signature);
+  if (USE_FAKE_REGISTRY) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    const seed = manifest.sha256 + signature;
+    const txSignature = truncateKey(seed.slice(0, 20) + seed.slice(-20));
+    return {
+      txSignature,
+      explorerUrl: `https://explorer.solana.com/tx/${seed.slice(0, 32)}`,
+    };
+  }
+
+  const unixSeconds = Math.floor(new Date(manifest.timestamp).getTime() / 1000);
+  const response = await fetch(`${BACKEND_URL}/attest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sha256: manifest.sha256,
+      timestamp: unixSeconds,
+      devicePubkey: manifest.devicePubkey,
+      signature,
+    }),
+  });
+  const body = await response.json();
+  if (!response.ok) {
+    throw new Error(body.error ?? `attest failed: HTTP ${response.status}`);
+  }
+  return { txSignature: body.txSignature, explorerUrl: body.explorerUrl };
 }
 
 /**

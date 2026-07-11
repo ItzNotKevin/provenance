@@ -14,5 +14,5 @@
     "nativewind-env.d.ts",
     "css.d.ts"
   ],
-  "exclude": ["node_modules", "scripts", "program"]
+  "exclude": ["node_modules", "scripts", "program", "backend"]
 }

@@ -17,27 +17,34 @@ index** (rebuildable by replaying the chain). Hackathon tracks: **Solana** (prim
 
 ## Repo status at a glance
 
-This repo currently contains **only the mobile capture/verify app** (the `verifysystem` Expo project).
-The device-side cryptography is **real**; everything past the device boundary is **faked in
-`lib/registry.ts`** with `setTimeout` + hardcoded data. The on-chain program, backend, and Chrome
-extension described in the plan **do not exist yet** — they are the work to be continued.
+This repo contains the mobile capture/verify app (the `verifysystem` Expo project), the deployed
+on-chain program (`program/`), and now a minimal backend (`backend/`). The device-side cryptography
+is **real**; `attestPhoto` in `lib/registry.ts` is real too (behind a feature flag — see below), and
+`lookupHash` is real (a direct client-side chain read — no backend needed for exact-match lookups,
+see `lib/solana.ts`). `recentAttestations` is still faked with `setTimeout` + hardcoded data.
+The Chrome extension described in the plan does not exist yet.
 
 | Component | Plan location | State in repo |
 |---|---|---|
 | Capture app (Expo RN) | §3.1 | ✅ **Built** — camera, real Ed25519 sign, real SHA-256 |
 | Device keypair / secure store | §3.1 | ✅ **Built** — `lib/deviceKey.ts` (tweetnacl + secure-store) |
 | Verify UI (green/amber/grey) | §3.3 | ✅ **UI built** — but only green/grey are ever produced |
-| Registry list + record detail | §3.2 | ✅ **UI built** — reads fake data |
+| **Verify: GREEN/GREY lookup** | §3.3 | ✅ **Real** — `lib/solana.ts` reads the PDA directly, no database |
+| Registry list + record detail | §3.2 | ✅ **UI built** — list still reads fake data |
 | **On-chain Anchor program** | §3.2 | ✅ **Deployed to devnet + smoke-tested** — `program/` (id `EoWdD…jZ8g`) |
-| **Backend + verifier + Mongo** | §3.3 | ❌ **Not started** — no server, all calls stubbed |
+| **Backend: `attestPhoto`** | §3.3 | 🟡 **Built, verified by simulation, blocked on funding** — `backend/` (see `backend/README.md`) |
 | **pHash core** | §4 | ✅ **Built + verified** — `lib/phash.ts` (`scripts/phash-check.ts` passes) |
-| **Amber tier wiring** | §4 | ❌ **Not started** — amber UI exists; backend must compute pHash + return amber |
+| **Amber tier wiring** | §4 | ❌ **Not started** — amber UI exists; needs the pHash + Mongo backend match described in `lib/CLAUDE.md` |
 | **Chrome extension** | §3.4 | ❌ **Not started** |
 | CLIP embeddings (stretch) | §4 | ❌ Not started (deliberately last) |
 
-**The one file that fakes the world:** [lib/registry.ts](lib/registry.ts). `lookupHash`,
-`attestPhoto`, and `recentAttestations` are mocks. Replacing them with real chain/backend calls is
-the central task of "continuing the work." See [lib/CLAUDE.md](lib/CLAUDE.md) for the exact seams.
+**The one file that fakes the world:** [lib/registry.ts](lib/registry.ts). `attestPhoto` calls the
+real backend when `EXPO_PUBLIC_USE_FAKE_REGISTRY=false` (see [lib/config.ts](lib/config.ts));
+`lookupHash` always calls the real chain read (see [lib/solana.ts](lib/solana.ts)), falling back to
+GREY (never a false positive) if the RPC is unreachable. `recentAttestations` is still a mock —
+replacing it (a real listing needs either Mongo or a `getProgramAccounts` scan) is the remaining
+"continuing the work" for the registry tab. See [lib/CLAUDE.md](lib/CLAUDE.md) for the exact seams
+and [backend/README.md](backend/README.md) for the fee-payer funding blocker.
 
 **✅ Live on devnet (2026-07-11):** the on-chain program is deployed and smoke-tested end-to-end
 (device signature → ed25519 verify → `attest_photo` → PDA → read-back → dup rejection all pass).
@@ -45,9 +52,11 @@ the central task of "continuing the work." See [lib/CLAUDE.md](lib/CLAUDE.md) fo
 - Build/deploy/test: `cd program && ./build.sh && ./deploy.sh && npm run smoke` — **do NOT use
   `anchor build`** (it force-downgrades Solana to a rust that can't compile modern crates; the
   toolchain war is documented in [program/README.md](program/README.md)).
-- **Next chain task:** the app signs JSON but the program verifies a fixed byte layout
-  (`sha256‖timestamp_i64LE‖devicePubkey`) — update `signManifest` in `app/(tabs)/capture.tsx` to match
-  before wiring real capture. This is the last app↔chain gap.
+- **App↔chain signing gap closed:** `app/(tabs)/capture.tsx` now signs the canonical fixed-byte
+  layout (`sha256‖timestamp_i64LE‖devicePubkey`) via `lib/manifest.ts` → `canonicalManifestBytes`,
+  matching `canonical_message` in `program/programs/provenance/src/lib.rs`. Not yet devnet-tested
+  from the real app (still blocked on the backend, which builds the paired Ed25519 precompile
+  instruction and submits the transaction — see Rung 6 in `docs/ROADMAP.md`).
 
 ## How to run
 

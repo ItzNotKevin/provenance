@@ -20,7 +20,7 @@ export function PrimaryButton({ label, className = "", ...rest }: ButtonProps & 
 export function GhostButton({ label, className = "", ...rest }: ButtonProps & { className?: string }) {
   return (
     <Pressable
-      className={`w-full border border-hairline py-4 items-center justify-center active:opacity-70 ${className}`}
+      className={`w-full border border-hairline py-4 items-center justify-center active:opacity-70 active:border-accent ${className}`}
       {...rest}
     >
       <Text className="font-mono-medium text-xs text-on-surface-variant uppercase tracking-widest">

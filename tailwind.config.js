@@ -24,6 +24,8 @@ module.exports = {
         "verdict-amber": "#f59e0b",
         "verdict-amber-dim": "#78350f",
         "verdict-grey": "#71717a",
+        accent: "#c4b5fd",
+        "accent-red": "#fca5a5",
       },
       fontFamily: {
         mono: ["JetBrainsMono_400Regular"],

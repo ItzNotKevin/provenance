@@ -21,13 +21,13 @@ export default function RecordDetailScreen() {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="h-12 border-b border-hairline bg-surface flex-row items-center px-4">
         <Pressable onPress={() => router.back()} className="active:opacity-70">
-          <Text className="font-mono text-xs text-primary uppercase">‹ BACK</Text>
+          <Text className="font-mono text-xs text-primary uppercase active:text-accent">‹ BACK</Text>
         </Pressable>
       </View>
 
       {record === undefined && (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#ffffff" />
+          <ActivityIndicator color="#c4b5fd" />
         </View>
       )}
 

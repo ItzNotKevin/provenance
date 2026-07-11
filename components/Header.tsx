@@ -10,7 +10,7 @@ export default function Header() {
       style={{ paddingTop: insets.top + 8 }}
     >
       <Text className="font-mono-bold text-sm text-primary uppercase tracking-tighter">
-        ◆ VERIFY.SYSTEM
+        <Text className="text-accent">◆</Text> VERIFY.SYSTEM
       </Text>
     </View>
   );

@@ -13,19 +13,19 @@ export default function RegistrationFrame({
     <View className={`relative ${className}`} {...rest}>
       <View
         style={markStyle}
-        className="absolute top-0 left-0 border-t border-l border-primary"
+        className="absolute top-0 left-0 border-t border-l border-accent"
       />
       <View
         style={markStyle}
-        className="absolute top-0 right-0 border-t border-r border-primary"
+        className="absolute top-0 right-0 border-t border-r border-accent"
       />
       <View
         style={markStyle}
-        className="absolute bottom-0 left-0 border-b border-l border-primary"
+        className="absolute bottom-0 left-0 border-b border-l border-accent"
       />
       <View
         style={markStyle}
-        className="absolute bottom-0 right-0 border-b border-r border-primary"
+        className="absolute bottom-0 right-0 border-b border-r border-accent"
       />
       {children}
     </View>

@@ -7,7 +7,6 @@ import { GhostButton } from "@/components/Buttons";
 import { sha256Bytes, attestPhoto, type CaptureManifest } from "@/lib/registry";
 import { getDeviceIdentity, signManifest, truncatePubkey } from "@/lib/deviceKey";
 import { canonicalManifestBytes } from "@/lib/manifest";
-import { formatUnixSeconds } from "@/lib/solana";
 
 type Phase = "viewfinder" | "anchoring" | "anchored";
 
@@ -31,7 +30,7 @@ function WebFallback() {
   return (
     <View className="flex-1 items-center justify-center bg-background px-8">
       <RegistrationFrame className="border border-hairline bg-surface p-8 items-center gap-4">
-        <Text className="text-primary text-[32px]">◇</Text>
+        <Text className="text-accent-red text-[32px]">◇</Text>
         <Text className="font-mono-bold text-lg text-primary uppercase text-center tracking-widest">
           CAPTURE REQUIRES{"\n"}THE DEVICE APP
         </Text>
@@ -84,9 +83,13 @@ function NativeCapture() {
       setChecklistStep(1);
       await sleep(300);
 
-      const timestamp = Math.floor(Date.now() / 1000);
-      const manifest: CaptureManifest = { sha256, timestamp, devicePubkey: pubkeyHex };
-      const manifestBytes = canonicalManifestBytes(sha256, timestamp, pubkeyHex);
+      const unixSeconds = Math.floor(Date.now() / 1000);
+      const manifest: CaptureManifest = {
+        sha256,
+        timestamp: new Date(unixSeconds * 1000).toISOString(),
+        devicePubkey: pubkeyHex,
+      };
+      const manifestBytes = canonicalManifestBytes(sha256, unixSeconds, pubkeyHex);
       const signature = await signManifest(manifestBytes);
       setChecklistStep(2);
 
@@ -95,7 +98,7 @@ function NativeCapture() {
         txSignature,
         explorerUrl,
         sha256,
-        timestamp: formatUnixSeconds(timestamp),
+        timestamp: manifest.timestamp,
       });
       setPhase("anchored");
     } catch (err) {
