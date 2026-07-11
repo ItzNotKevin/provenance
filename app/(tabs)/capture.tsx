@@ -1,6 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { Image, Linking, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import {
+  Image,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  type GestureResponderEvent,
+} from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import { Ionicons } from "@expo/vector-icons";
 import RegistrationFrame from "@/components/RegistrationFrame";
 import LedgerRow from "@/components/LedgerRow";
 import { GhostButton } from "@/components/Buttons";
@@ -9,6 +19,9 @@ import { getDeviceIdentity, signManifest, truncatePubkey } from "@/lib/deviceKey
 import { canonicalManifestBytes } from "@/lib/manifest";
 
 type Phase = "viewfinder" | "anchoring" | "anchored";
+type FlashMode = "off" | "on" | "auto";
+
+const FLASH_CYCLE: Record<FlashMode, FlashMode> = { off: "on", on: "auto", auto: "off" };
 
 const CHECKLIST_STEPS = [
   "SHA-256 COMPUTED",
@@ -64,9 +77,119 @@ function NativeCapture() {
     timestamp: string;
   } | null>(null);
 
+  const [zoom, setZoom] = useState(0);
+  const [flashMode, setFlashMode] = useState<FlashMode>("off");
+  const [afLocked, setAfLocked] = useState(false);
+  const [flashToast, setFlashToast] = useState(false);
+  const [zoomHudVisible, setZoomHudVisible] = useState(false);
+  const [focusReticle, setFocusReticle] = useState<{ x: number; y: number; locked: boolean } | null>(
+    null
+  );
+
+  const afLockedRef = useRef(false);
+  const pinchStateRef = useRef<{ distance: number; zoom: number } | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reticleFadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const zoomHudFadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    afLockedRef.current = afLocked;
+  }, [afLocked]);
+
   useEffect(() => {
     getDeviceIdentity().then((id) => setPubkeyHex(id.publicKeyHex));
+    return () => {
+      if (longPressTimer.current) clearTimeout(longPressTimer.current);
+      if (reticleFadeTimer.current) clearTimeout(reticleFadeTimer.current);
+      if (zoomHudFadeTimer.current) clearTimeout(zoomHudFadeTimer.current);
+      if (flashToastTimer.current) clearTimeout(flashToastTimer.current);
+    };
   }, []);
+
+  function touchDistance(touches: { pageX: number; pageY: number }[]) {
+    const [a, b] = touches;
+    return Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY);
+  }
+
+  function cycleFlash() {
+    setFlashMode((m) => FLASH_CYCLE[m]);
+    setFlashToast(true);
+    if (flashToastTimer.current) clearTimeout(flashToastTimer.current);
+    flashToastTimer.current = setTimeout(() => setFlashToast(false), 900);
+  }
+
+  function handleViewfinderGrant(e: GestureResponderEvent) {
+    const touches = e.nativeEvent.touches;
+    if (touches.length >= 2) {
+      pinchStateRef.current = { distance: touchDistance(touches), zoom };
+      return;
+    }
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    if (reticleFadeTimer.current) clearTimeout(reticleFadeTimer.current);
+
+    if (afLockedRef.current) {
+      // Tapping anywhere while locked releases the lock, matching iOS.
+      setAfLocked(false);
+      setFocusReticle(null);
+      return;
+    }
+
+    const { locationX, locationY } = e.nativeEvent;
+    setFocusReticle({ x: locationX, y: locationY, locked: false });
+    longPressTimer.current = setTimeout(() => {
+      setAfLocked(true);
+      setFocusReticle({ x: locationX, y: locationY, locked: true });
+    }, 500);
+  }
+
+  function handleViewfinderMove(e: GestureResponderEvent) {
+    const touches = e.nativeEvent.touches;
+
+    if (touches.length >= 2) {
+      // A second finger just landed — this is definitely a pinch, not a tap/hold.
+      // The second touch arrives via a move event, not a fresh grant, so the
+      // single-finger long-press timer from the first touch must be killed here.
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+      if (reticleFadeTimer.current) clearTimeout(reticleFadeTimer.current);
+      setFocusReticle(null);
+
+      if (!pinchStateRef.current) {
+        pinchStateRef.current = { distance: touchDistance(touches), zoom };
+        return;
+      }
+      const scale = touchDistance(touches) / pinchStateRef.current.distance;
+      const next = Math.min(1, Math.max(0, pinchStateRef.current.zoom + (scale - 1) * 0.75));
+      setZoom(next);
+      setZoomHudVisible(true);
+      if (zoomHudFadeTimer.current) clearTimeout(zoomHudFadeTimer.current);
+      zoomHudFadeTimer.current = setTimeout(() => setZoomHudVisible(false), 900);
+      return;
+    }
+
+    // Single finger drifting before the long-press fires — treat as a drag,
+    // not a hold-to-lock, so it doesn't lock focus at the original touch point.
+    if (longPressTimer.current && focusReticle) {
+      const { locationX, locationY } = e.nativeEvent;
+      const moved = Math.hypot(locationX - focusReticle.x, locationY - focusReticle.y);
+      if (moved > 12) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+        setFocusReticle(null);
+      }
+    }
+  }
+
+  function handleViewfinderRelease() {
+    pinchStateRef.current = null;
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    if (!afLockedRef.current) {
+      reticleFadeTimer.current = setTimeout(() => setFocusReticle(null), 600);
+    }
+  }
 
   async function handleShutter() {
     if (!cameraRef.current) return;
@@ -137,14 +260,91 @@ function NativeCapture() {
   if (phase === "viewfinder") {
     return (
       <View className="flex-1 bg-background">
-        <View className="flex-1 relative overflow-hidden">
-          <CameraView ref={cameraRef} style={{ flex: 1 }} facing="back" />
-          <View className="absolute top-4 left-4 flex-row items-center gap-2 bg-surface border border-hairline px-2 py-1">
-            <View className="w-2 h-2 rounded-full bg-primary" />
+        <View
+          className="flex-1 relative overflow-hidden"
+          onStartShouldSetResponder={() => true}
+          onMoveShouldSetResponder={() => true}
+          onResponderGrant={handleViewfinderGrant}
+          onResponderMove={handleViewfinderMove}
+          onResponderRelease={handleViewfinderRelease}
+          onResponderTerminate={handleViewfinderRelease}
+        >
+          <CameraView
+            ref={cameraRef}
+            style={{ flex: 1 }}
+            facing="back"
+            zoom={zoom}
+            flash={flashMode}
+            autofocus={afLocked ? "on" : "off"}
+          />
+
+          <View className="absolute top-4 left-4 flex-row items-center gap-2 bg-black/40 rounded-full px-3 py-1.5">
+            <View className="w-1.5 h-1.5 rounded-full bg-primary" />
             <Text className="font-mono text-[10px] text-on-surface uppercase">
-              DEVICE KEY {truncatePubkey(pubkeyHex || "0000000000000000")}
+              {truncatePubkey(pubkeyHex || "0000000000000000")}
             </Text>
           </View>
+
+          <Pressable
+            onPress={cycleFlash}
+            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/40 items-center justify-center active:opacity-70"
+          >
+            <Ionicons
+              name={
+                flashMode === "off" ? "flash-off-outline" : flashMode === "auto" ? "flash-outline" : "flash"
+              }
+              size={18}
+              color={flashMode === "off" ? "#a1a1aa" : flashMode === "auto" ? "#c4b5fd" : "#ffffff"}
+            />
+          </Pressable>
+
+          {flashToast && (
+            <View
+              pointerEvents="none"
+              className="absolute top-16 right-4 bg-black/60 rounded-full px-3 py-1"
+            >
+              <Text className="font-mono text-[9px] text-primary uppercase tracking-widest">
+                Flash: {flashMode}
+              </Text>
+            </View>
+          )}
+
+          {afLocked && (
+            <View pointerEvents="none" className="absolute top-4 left-0 right-0 items-center">
+              <View className="bg-black/50 rounded-full px-3 py-1">
+                <Text className="font-mono text-[9px] text-accent uppercase tracking-widest">
+                  AE / AF Lock
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {focusReticle && (
+            <View
+              pointerEvents="none"
+              className={`absolute w-16 h-16 border ${
+                focusReticle.locked ? "border-accent" : "border-primary"
+              }`}
+              style={{
+                left: focusReticle.x - 32,
+                top: focusReticle.y - 32,
+                borderRadius: 4,
+              }}
+            />
+          )}
+
+          {zoomHudVisible && (
+            <View
+              pointerEvents="none"
+              className="absolute self-center bottom-6 left-0 right-0 items-center"
+            >
+              <View className="bg-black/50 rounded-full w-14 h-14 items-center justify-center">
+                <Text className="font-mono-medium text-xs text-primary">
+                  {Math.round(zoom * 100)}%
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
         <View className="items-center gap-4 py-8 bg-background">
           <Pressable
