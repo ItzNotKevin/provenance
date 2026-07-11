@@ -46,12 +46,25 @@ embeddings → extension → edit lineage → geohash → amber.
 - [x] Switch app signing to the canonical fixed-byte layout (see `lib/manifest.ts` → `canonicalManifestBytes`, wired into `app/(tabs)/capture.tsx`)
 - [ ] `@solana/web3.js` + Anchor-generated TS client (backend builds the 2-ix tx: ed25519 verify + attest_photo)
 
-### Rung 6 — Backend + verifier (Node/TS, Next.js, MongoDB Atlas M0)
-- [ ] Validate manifests; co-sign + submit tx as **fee payer**, with retry
-- [ ] Index `{sha256, phash, chain_address, timestamp, device, parent_hash}` into Mongo
+### Rung 6 — Backend + verifier (Node/TS, MongoDB Atlas M0)
+- [x] Scaffold `backend/` — `POST /attest` validates the device's Ed25519 signature over the
+  canonical manifest, then submits the real 2-ix devnet tx (see `backend/README.md`)
+- [x] Verified against the live deployed program via `backend/scripts/dry-run.ts`
+  (`simulateTransaction`, no funds needed) — IDL, PDA seeds, message layout all correct
+- [ ] **Blocked: fund the fee-payer wallet** (`9eeGRkoPDGQEryN2iEbswsPDcRtqLGx2F1WiGXBny46h`) —
+  public devnet airdrop RPC is rate-limited and `faucet.solana.com` needs a captcha solved in a
+  browser; see `backend/README.md` "Fee payer: needs manual funding". This is the last step
+  before a real end-to-end tx can be sent (Rung 4).
+- [ ] Retry logic on submit
+- [ ] `/lookup/:sha256` — GREEN tier direct PDA read (no DB needed per lib/CLAUDE.md — pure
+  chain read)
+- [ ] pHash-at-ingest (needs image bytes uploaded, not just the manifest) + index
+  `{sha256, phash, chain_address, timestamp, device, parent_hash}` into Mongo
 - [ ] `/verify` with all three tiers + **chain-confirmation baked in from the start**
 - [ ] Reindex script: rebuild Mongo by scanning on-chain accounts
-- [ ] **Wire the app:** replace the three stubs in `lib/registry.ts` (see [../lib/CLAUDE.md](../lib/CLAUDE.md))
+- [x] **Wire the app:** `attestPhoto` in `lib/registry.ts` now calls the backend behind
+  `EXPO_PUBLIC_USE_FAKE_REGISTRY` (see [../lib/config.ts](../lib/config.ts)); `lookupHash` and
+  `recentAttestations` are still the original stubs — see [../lib/CLAUDE.md](../lib/CLAUDE.md)
 
 ### Rung 7 — Verifier in tier order
 - [ ] GREEN (needs no DB — buildable the moment the chain works)
