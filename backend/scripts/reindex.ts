@@ -3,23 +3,20 @@
  * on-chain (getProgramAccounts) — this is what makes "the index is fully rebuildable by
  * replaying the chain" (root CLAUDE.md) literally true, not just a claim. Safe to run anytime:
  * upserts by sha256, so it's idempotent and can run alongside the live write-through indexing
- * in src/server.ts without conflict.
+ * in src/http.ts without conflict.
  *
  * Run: node scripts/reindex.ts
  */
-import { readFileSync } from "node:fs";
 import anchor from "@coral-xyz/anchor";
 import { RPC_URL } from "../src/config.ts";
-import { decodePhotoAttestation } from "../src/chain.ts";
+import { PROGRAM_ID } from "../../lib/solanaConfig.ts";
+import { decodeAttestation } from "../src/lookup.ts";
 import { indexAttestation, toAttestationDocument, ensureIndexes, closeMongo } from "../src/mongo.ts";
 
 const { web3 } = anchor;
 const { PublicKey, Connection } = web3;
 
-const idl = JSON.parse(
-  readFileSync(new URL("../../program/target/idl/provenance.json", import.meta.url), "utf8")
-);
-const programId = new PublicKey(idl.address);
+const programId = new PublicKey(PROGRAM_ID);
 const connection = new Connection(RPC_URL, "confirmed");
 
 console.log("program id:", programId.toBase58());
@@ -33,14 +30,19 @@ await ensureIndexes();
 let indexed = 0;
 let skipped = 0;
 for (const { pubkey, account } of accounts) {
-  let record;
+  let decoded;
   try {
-    record = decodePhotoAttestation(account.data, pubkey.toBase58());
+    decoded = decodeAttestation(account.data);
   } catch (err) {
     console.warn(`skipping ${pubkey.toBase58()}: not a PhotoAttestation (${(err as Error).message})`);
     skipped++;
     continue;
   }
+  const record = {
+    ...decoded,
+    pda: pubkey.toBase58(),
+    explorerUrl: `https://explorer.solana.com/address/${pubkey.toBase58()}?cluster=devnet`,
+  };
 
   // Best-effort tx signature lookup (the oldest confirmed signature for this PDA is the
   // creating attest_photo tx) — not load-bearing for the index, so a failure here doesn't

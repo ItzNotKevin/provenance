@@ -18,33 +18,35 @@ index** (rebuildable by replaying the chain). Hackathon tracks: **Solana** (prim
 ## Repo status at a glance
 
 This repo contains the mobile capture/verify app (the `verifysystem` Expo project), the deployed
-on-chain program (`program/`), and now a minimal backend (`backend/`). The device-side cryptography
-is **real**; `attestPhoto` in `lib/registry.ts` is real too (behind a feature flag — see below), and
-`lookupHash` is real (a direct client-side chain read — no backend needed for exact-match lookups,
-see `lib/solana.ts`). `recentAttestations` is still faked with `setTimeout` + hardcoded data.
-The Chrome extension described in the plan does not exist yet.
+on-chain program (`program/`), and a real backend (`backend/`) — chain writes, chain reads, a
+MongoDB search index, and Atlas Vector Search AMBER matching. The device-side cryptography is
+**real**; `attestPhoto` and `recentAttestations` in `lib/registry.ts` are both real now (behind a
+feature flag — see below), and `lookupHash` is real (a direct client-side chain read — no backend
+needed for exact-match lookups, see `lib/solana.ts`). The Chrome extension described in the plan
+does not exist yet.
 
 | Component | Plan location | State in repo |
 |---|---|---|
 | Capture app (Expo RN) | §3.1 | ✅ **Built** — camera, real Ed25519 sign, real SHA-256 |
 | Device keypair / secure store | §3.1 | ✅ **Built** — `lib/deviceKey.ts` (tweetnacl + secure-store) |
-| Verify UI (green/amber/grey) | §3.3 | ✅ **UI built** — but only green/grey are ever produced |
+| Verify UI (green/amber/grey) | §3.3 | ✅ **UI built** — but only green/grey are ever produced client-side |
 | **Verify: GREEN/GREY lookup** | §3.3 | ✅ **Real** — `lib/solana.ts` reads the PDA directly, no database |
-| Registry list + record detail | §3.2 | ✅ **UI built** — list still reads fake data |
+| Registry list + record detail | §3.2 | ✅ **UI built** — real Mongo-backed list (`recentAttestations`) |
 | **On-chain Anchor program** | §3.2 | ✅ **Deployed to devnet + smoke-tested** — `program/` (id `EoWdD…jZ8g`) |
-| **Backend: `attestPhoto`** | §3.3 | 🟡 **Built, verified by simulation, blocked on funding** — `backend/` (see `backend/README.md`) |
+| **Backend API** | §3.3 | ✅ **`/attest`, `/lookup`, `/recent`, `/verify` all live and funded** — `backend/` (see `backend/README.md`) |
 | **pHash core** | §4 | ✅ **Built + verified** — `lib/phash.ts` (`scripts/phash-check.ts` passes) |
-| **Amber tier wiring** | §4 | ❌ **Not started** — amber UI exists; needs the pHash + Mongo backend match described in `lib/CLAUDE.md` |
+| **Amber tier (backend)** | §4 | ✅ **Built + live-tested** — pHash-at-ingest (`backend/src/imagePhash.ts`), Atlas Vector Search + Hamming distance matching, `POST /verify` — see `backend/README.md` |
+| **Amber tier (app)** | §4 | ❌ **Not wired** — `lib/solana.ts`'s `realLookupHash` still only ever returns green/grey; needs to call the backend's `/verify` when GREEN misses |
 | **Chrome extension** | §3.4 | ❌ **Not started** |
 | CLIP embeddings (stretch) | §4 | ❌ Not started (deliberately last) |
 
-**The one file that fakes the world:** [lib/registry.ts](lib/registry.ts). `attestPhoto` calls the
-real backend when `EXPO_PUBLIC_USE_FAKE_REGISTRY=false` (see [lib/config.ts](lib/config.ts));
-`lookupHash` always calls the real chain read (see [lib/solana.ts](lib/solana.ts)), falling back to
-GREY (never a false positive) if the RPC is unreachable. `recentAttestations` is still a mock —
-replacing it (a real listing needs either Mongo or a `getProgramAccounts` scan) is the remaining
-"continuing the work" for the registry tab. See [lib/CLAUDE.md](lib/CLAUDE.md) for the exact seams
-and [backend/README.md](backend/README.md) for the fee-payer funding blocker.
+**The one file that fakes the world:** [lib/registry.ts](lib/registry.ts). `attestPhoto` and
+`recentAttestations` both call the real backend when `EXPO_PUBLIC_USE_FAKE_REGISTRY=false` (see
+[lib/config.ts](lib/config.ts)); `lookupHash` always calls the real chain read (see
+[lib/solana.ts](lib/solana.ts)), falling back to GREY (never a false positive) if the RPC is
+unreachable — it does not yet call the backend's AMBER-capable `/verify`, so wiring AMBER into
+the app is the remaining "continuing the work" here. See [lib/CLAUDE.md](lib/CLAUDE.md) for the
+exact seams and [backend/README.md](backend/README.md) for the full backend API.
 
 **✅ Live on devnet (2026-07-11):** the on-chain program is deployed and smoke-tested end-to-end
 (device signature → ed25519 verify → `attest_photo` → PDA → read-back → dup rejection all pass).
@@ -54,9 +56,11 @@ and [backend/README.md](backend/README.md) for the fee-payer funding blocker.
   toolchain war is documented in [program/README.md](program/README.md)).
 - **App↔chain signing gap closed:** `app/(tabs)/capture.tsx` now signs the canonical fixed-byte
   layout (`sha256‖timestamp_i64LE‖devicePubkey`) via `lib/manifest.ts` → `canonicalManifestBytes`,
-  matching `canonical_message` in `program/programs/provenance/src/lib.rs`. Not yet devnet-tested
-  from the real app (still blocked on the backend, which builds the paired Ed25519 precompile
-  instruction and submits the transaction — see Rung 6 in `docs/ROADMAP.md`).
+  matching `canonical_message` in `program/programs/provenance/src/lib.rs`. The backend (builds
+  the paired Ed25519 precompile instruction and submits the transaction) is live and
+  fee-payer-funded; live-tested end to end with a real signed manifest through `POST /attest` to
+  real devnet — not yet exercised from the physical device/simulator, only from a script mirroring
+  the app's signing path (see Rung 6 in `docs/ROADMAP.md`).
 
 ## How to run
 
@@ -70,9 +74,10 @@ npm run web        # web build (VERIFY-ONLY — capture is disabled on web by de
 
 - **Camera capture requires a real device or simulator with a camera.** On web, the Capture tab
   renders a "requires the device app" fallback and signing throws by design (`lib/deviceKey.ts`).
-- No `.env` / secrets / backend needed today — the app is fully self-contained on fake data.
-- There is **no test suite** and **no linter configured**. Verification = run the app and drive the
-  flow (see "Verifying changes" below).
+- The app itself needs no `.env` / secrets to run in its default (fake-registry) mode. The
+  **backend** does use one (`backend/.env`, gitignored — `MONGODB_URI`, optional fee-payer
+  overrides) — see `backend/README.md`.
+- There is a fast offline test suite (see "Verifying changes" below) but **no linter configured**.
 
 ## How Claude should work in this repo
 
@@ -155,9 +160,11 @@ components/                presentational building blocks (all NativeWind)
   VerdictView.tsx          full green/amber/grey verdict layout (used by verify + record)
 lib/
   deviceKey.ts             Ed25519 keypair (tweetnacl), secure-store persist, signManifest  ← REAL
-  registry.ts             sha256Bytes (REAL) + lookupHash/attestPhoto/recentAttestations (FAKE)
+  registry.ts              sha256Bytes/lookupHash/attestPhoto/recentAttestations — all REAL now
+                            (lookupHash is client-side chain-only, GREEN/GREY; AMBER not wired)
   phash.ts                 DCT perceptual hash core for the amber tier (pure)              ← REAL
   manifest.ts              canonical signed-message builder (mirrors the on-chain format)  ← REAL
+  solana.ts                client-side chain reads (GREEN/GREY), no backend needed         ← REAL
 tests/                     fast offline unit tests (node --test): phash.test.ts, manifest.test.ts
 scripts/
   phash-check.ts           node scripts/phash-check.ts — human-readable pHash demo
@@ -170,6 +177,17 @@ program/                   Anchor/Solana program (DEPLOYED to devnet)
   scripts/gen-idl.mjs      deterministic IDL generator (update if program interface changes)
   tests/smoke.ts           `npm run smoke` — end-to-end devnet attestation test
   README.md                toolchain gotchas, tx shape, signing contract the app must adopt
+backend/                   Node/TS API — chain writes/reads, Mongo index, AMBER matching (DEPLOYED nowhere, run locally)
+  src/chain.ts             submitAttestation — builds/submits the real 2-ix attest_photo tx
+  src/lookup.ts            lookupAttestation/decodeAttestation — GREEN-tier chain read (DI-testable)
+  src/mongo.ts             Mongo mirror: indexing, /recent pagination, AMBER candidate search
+  src/phashVector.ts       pHash ↔ 64-dim ±1 vector encoding for Atlas Vector Search
+  src/imagePhash.ts        real pHash computed server-side from uploaded image bytes (via sharp)
+  src/http.ts              route handlers: /attest /lookup /recent /verify /health (DI-testable)
+  src/server.ts            thin: creates the HTTP server from http.ts's request handler
+  scripts/reindex.ts        rebuilds the Mongo index from getProgramAccounts (npm run reindex)
+  scripts/create-vector-index.ts  one-time Atlas Vector Search index setup
+  README.md                 full API + env var docs — read before touching this directory
 docs/
   PLAN.md                  full product brief (problem, architecture, pitch, judge Q&A)
   ROADMAP.md               dependency-ladder checklist with checkboxes + cut order

@@ -1,6 +1,6 @@
 import { MongoClient, type Collection, type Db } from "mongodb";
 import { MONGODB_URI } from "./config.ts";
-import type { OnChainAttestation } from "./chain.ts";
+import type { ChainAttestationRecord } from "./lookup.ts";
 import { hammingDistanceHex } from "../../lib/phash.ts";
 import { phashHexToVector, PHASH_VECTOR_DIMENSIONS } from "./phashVector.ts";
 
@@ -31,11 +31,14 @@ const COLLECTION = "attestations";
 /** Name of the Atlas Vector Search index over `phashVector` (see ensureVectorIndex). */
 export const PHASH_VECTOR_INDEX_NAME = "phash_vector_index";
 
+/** Thrown when MONGODB_URI isn't set — callers (see http.ts) treat this as "feature disabled", not a failure. */
+export class MongoNotConfiguredError extends Error {}
+
 let clientPromise: Promise<MongoClient> | null = null;
 
 function getClient(): Promise<MongoClient> {
   if (!MONGODB_URI) {
-    throw new Error("MONGODB_URI is not set — see backend/README.md");
+    throw new MongoNotConfiguredError("MONGODB_URI is not set — see backend/README.md");
   }
   if (!clientPromise) {
     clientPromise = new MongoClient(MONGODB_URI).connect();
@@ -97,7 +100,9 @@ export async function waitForVectorIndexReady(timeoutMs = 120_000): Promise<bool
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     const indexes = await col.listSearchIndexes(PHASH_VECTOR_INDEX_NAME).toArray();
-    if (indexes[0]?.queryable) return true;
+    // The driver's TS types for listSearchIndexes don't declare `queryable`, even though
+    // Atlas returns it at runtime — cast narrowly rather than widening the whole result type.
+    if ((indexes[0] as { queryable?: boolean } | undefined)?.queryable) return true;
     await new Promise((resolve) => setTimeout(resolve, 3000));
   }
   return false;
@@ -105,7 +110,7 @@ export async function waitForVectorIndexReady(timeoutMs = 120_000): Promise<bool
 
 /** Maps a confirmed on-chain read into the Mongo document shape. Pure — no I/O. */
 export function toAttestationDocument(
-  record: OnChainAttestation,
+  record: ChainAttestationRecord,
   extra: { txSignature: string | null }
 ): AttestationDocument {
   return {
@@ -117,7 +122,7 @@ export function toAttestationDocument(
     timestamp: record.timestamp,
     device: record.devicePubkey,
     parentHash: record.parentHash,
-    slot: record.slot,
+    slot: Number(record.slot), // lookup.ts keeps slot as a decimal string (u64-safe); fine as a number here
     txSignature: extra.txSignature,
     explorerUrl: record.explorerUrl,
     indexedAt: Date.now(),

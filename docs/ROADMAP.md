@@ -58,19 +58,20 @@ embeddings → extension → edit lineage → geohash → amber.
   loads; README could use a follow-up correction.)
 - [ ] Retry logic on submit
 - [x] `/lookup/:sha256` — GREEN tier direct PDA read (no DB, no fee payer — pure chain read;
-  `backend/src/chain.ts` → `lookupAttestation`, route in `backend/src/server.ts`). Returns
-  `{tier:"green",record}` or `{tier:"grey"}`; verified live against devnet + offline decode tests.
+  `backend/src/lookup.ts` → `lookupAttestation`, route in `backend/src/http.ts`). Returns
+  `{tier:"green",record}` (200) or `{tier:"grey",sha256}` (404); verified live against devnet
+  + offline decode tests, including defensive checks (account owner, sha256-matches-PDA-seed).
   (Note: the *app's* `lookupHash` already reads the chain client-side via `lib/solana.ts`; this
   server endpoint is for the web verifier / extension and is the base for `/verify` amber.)
 - [x] Mongo indexing — `backend/src/mongo.ts`. Write-through on every successful `/attest`
-  (`indexAfterAttest` in `backend/src/server.ts` re-reads the just-confirmed PDA via
+  (`indexAfterAttest` in `backend/src/http.ts` re-reads the just-confirmed PDA via
   `lookupAttestation` before indexing, so every doc traces to a confirmed chain read — never
   trusts the write-path input directly). Schema: `{sha256, phash, chainAddress, timestamp,
   device, parentHash, slot, txSignature, explorerUrl, indexedAt}`, upserted by `sha256`.
   Non-fatal on Mongo failure (chain write already succeeded — Mongo is disposable). Verified
   live against the real Atlas cluster + real devnet accounts.
 - [x] **pHash-at-ingest.** `POST /attest` accepts an optional `imageBase64` field — the exact
-  bytes the device hashed/signed. `computeImagePhash` (`backend/src/server.ts`) re-hashes the
+  bytes the device hashed/signed. `computeImagePhash` (`backend/src/http.ts`) re-hashes the
   upload and **rejects it (400) if it doesn't match the already-signed sha256** (the binding
   that ties pHash back to the attested photo despite pHash never being part of the signed
   message), then `computePhashFromImageBytes` (`backend/src/imagePhash.ts`, via `sharp`) computes
@@ -90,22 +91,22 @@ embeddings → extension → edit lineage → geohash → amber.
   `AMBER_HAMMING_THRESHOLD = 10` is a conservative placeholder pending the real Rung 2
   experiment.
 - [x] **`/verify` with all three tiers + chain-confirmation baked in from the start** —
-  `backend/src/server.ts` `handleVerify`: GREEN (exact chain read) → AMBER (`findAmberCandidates`,
+  `backend/src/http.ts` `handleVerify`: GREEN (exact chain read) → AMBER (`findAmberCandidates`,
   each candidate re-read from the chain via `lookupAttestation` before being returned — a
-  Mongo-only match is never trusted, tries the next candidate if one fails to confirm) → GREY.
-  Live-verified end-to-end against the real Atlas cluster + real devnet data, both with
-  synthetic vectors and with a real attested image matched against a real recompressed
-  derivative (see pHash-at-ingest above) — `{tier:"amber", hammingDistance:0-3,
-  record:{...chain-confirmed...}}`.
+  Mongo-only match is never trusted, tries the next candidate if one fails to confirm) → GREY
+  (404, matching `/lookup`'s convention). Live-verified end-to-end against the real Atlas
+  cluster + real devnet data, both with synthetic vectors and with a real attested image
+  matched against a real recompressed derivative (see pHash-at-ingest above) —
+  `{tier:"amber", hammingDistance:0-3, record:{...chain-confirmed...}}`.
 - [x] Reindex script: `backend/scripts/reindex.ts` (`npm run reindex`) — scans
-  `getProgramAccounts`, decodes every `PhotoAttestation`, upserts into Mongo. Makes "the index
-  is fully rebuildable from the chain" literally true; verified against the 2 real devnet
-  accounts.
+  `getProgramAccounts`, decodes every `PhotoAttestation` via `lookup.ts`'s `decodeAttestation`,
+  upserts into Mongo. Makes "the index is fully rebuildable from the chain" literally true;
+  verified against the 2 real devnet accounts.
 - [x] **Wire the app:** `attestPhoto` and `recentAttestations` in `lib/registry.ts` now call the
   backend behind `EXPO_PUBLIC_USE_FAKE_REGISTRY` (see [../lib/config.ts](../lib/config.ts));
   `recentAttestations` hits `GET /recent` (the Mongo mirror) and maps documents back to the
   exact `AttestationRecord` shape the UI already expects — zero UI changes needed. `lookupHash`
-  `recentAttestations` are still the original stubs — see [../lib/CLAUDE.md](../lib/CLAUDE.md)
+  was already real (client-side, `lib/solana.ts`) — see [../lib/CLAUDE.md](../lib/CLAUDE.md).
 
 ### Rung 7 — Verifier in tier order
 - [ ] GREEN (needs no DB — buildable the moment the chain works)
@@ -123,7 +124,7 @@ embeddings → extension → edit lineage → geohash → amber.
 
 ### Rung 10 — Threaded to the end
 - [x] Test suite scaffolding: `npm test` (TS: pHash + signing contract) + `npm run test:all` (adds Rust); pre-push hook + GitHub Actions CI — all offline, $0
-  - [ ] **Expand coverage as we build** (current suite only covers pHash + signing): backend `/verify` tiers + chain-confirmation, de-stubbed `lib/registry.ts`, new program instructions (edit lineage), extension. Add tests in the same change as each feature.
+  - [ ] **Expand coverage as we build** (current suite covers pHash, signing, and the full backend: GREEN lookup, Mongo indexing, AMBER matching, `/verify` three-tier + chain-confirmation, pHash-at-ingest): de-stubbed `lib/registry.ts`'s remaining client paths, new program instructions (edit lineage), extension. Add tests in the same change as each feature.
 - [ ] Demo-proofing: HEIC / large files / malformed input / graceful no-match / RPC fallback / loading states (judges WILL try to break it)
 - [ ] Pitch script written + rehearsed (2 people: one drives, one narrates)
 - [ ] Venue Wi-Fi contingency (RPC retry + cached fallback)

@@ -10,12 +10,13 @@ Validates a device-signed capture manifest, co-signs as **fee payer**, and submi
 - ✅ `POST /attest` — validates the Ed25519 signature over the canonical manifest bytes, then
   builds and submits the same 2-instruction transaction as `program/tests/smoke.ts` (Ed25519
   precompile verify + `attest_photo`).
-- ✅ `GET /lookup/:sha256` — GREEN-tier verdict. Derives the PDA from the SHA-256 and reads it
-  directly from devnet (read-only: no fee payer, signs/spends nothing). Returns
-  `{ "tier": "green", "record": {…} }` when the photo is attested on-chain, `{ "tier": "grey" }`
-  otherwise, `400` for a malformed hash. Account bytes are decoded manually
-  (`decodePhotoAttestation`), matching the layout in `program/…/lib.rs` and the client-side
-  decoder in `lib/solana.ts`. Verified live + offline decode tests (`npm test`).
+- ✅ `GET /lookup/:sha256` — GREEN-tier verdict. Derives the PDA from the SHA-256 and reads the
+  program-owned account directly from devnet (read-only: no fee payer, signs/spends nothing;
+  no MongoDB dependency either). Returns `200 { "tier": "green", "record": {…} }` when the PDA
+  exists, `404 { "tier": "grey", "sha256": … }` when it doesn't, `400` for a malformed hash,
+  `502` if the RPC is unavailable. Decoding (`decodeAttestation` in `src/lookup.ts`) is
+  dependency-injected for testing and defensively checks the account's owner and that its
+  decoded sha256 matches its PDA seed. Verified live + offline decode tests (`npm test`).
 - ✅ Verified against the real deployed devnet program via `scripts/dry-run.ts`
   (`simulateTransaction`, no funds required) — IDL loads, PDA derivation matches, canonical
   message bytes match the on-chain program, signature validates.
@@ -29,10 +30,11 @@ Validates a device-signed capture manifest, co-signs as **fee payer**, and submi
   from `getProgramAccounts`. See "Mongo" below.
 - ✅ **`POST /verify` — full three-tier verdict**, with Atlas Vector Search-accelerated AMBER
   matching. GREEN (exact chain read) → AMBER (pHash nearest-neighbor search, every candidate
-  re-read from the chain before it's trusted) → GREY (no match). See "AMBER matching" below.
+  re-read from the chain before it's trusted) → GREY (`404`, matching `/lookup`'s convention).
+  See "AMBER matching" below.
 - ✅ **pHash-at-ingest.** `/attest` accepts an optional `imageBase64` field (the exact captured
   bytes). The server re-hashes them and rejects the request if they don't match the
-  already-signed `sha256` (`computeImagePhash` in `src/server.ts`), then decodes via `sharp`
+  already-signed `sha256` (`computeImagePhash` in `src/http.ts`), then decodes via `sharp`
   (`src/imagePhash.ts`) and computes the real pHash — baked into the immutable on-chain record
   at creation, since there's no "update pHash" instruction. `lib/registry.ts`'s `attestPhoto`
   and `app/(tabs)/capture.tsx` are wired to send it. Live-tested end to end: attested a real
@@ -45,7 +47,9 @@ Validates a device-signed capture manifest, co-signs as **fee payer**, and submi
 ```bash
 cd backend
 npm install
-npm start                              # POST /attest on :8787, GET /health
+npm start                              # API on :8787
+npm run typecheck                      # strict TypeScript check
+npm test                               # offline chain + HTTP unit tests
 ```
 
 Env vars (all optional). `npm start`/`npm run dev` auto-load `backend/.env` if present
@@ -65,6 +69,16 @@ CLI default), set `FEE_PAYER_KEYPAIR_PATH` or `FEE_PAYER_SECRET_KEY` — see the
 Requires `program/target/idl/provenance.json` to exist — generate it with
 `cd program && node scripts/gen-idl.mjs` (or `./build.sh`; see `program/README.md`; do **not**
 use `anchor build`).
+
+Read-only lookup does not require the IDL or a fee-payer key:
+
+```bash
+curl http://localhost:8787/lookup/<64-character-sha256>
+```
+
+- `200 { "tier": "green", "record": ... }` when the program-owned PDA exists.
+- `404 { "tier": "grey", "sha256": ... }` when it does not exist.
+- `400` for a malformed SHA-256 and `502` when the Solana RPC is unavailable or returns invalid data.
 
 ## Sanity-check without spending SOL
 
@@ -98,7 +112,7 @@ txSignature, explorerUrl, indexedAt}` — see `src/mongo.ts` for the full `Attes
 ## pHash-at-ingest (image upload)
 
 `POST /attest` accepts an optional `imageBase64` field — the exact bytes the device hashed and
-signed, base64-encoded. When present (`computeImagePhash` in `src/server.ts`):
+signed, base64-encoded. When present (`computeImagePhash` in `src/http.ts`):
 
 1. The server re-hashes the decoded bytes with `sha256` and **rejects the request (400)** if it
    doesn't match the already-signed `sha256` field. This is the critical binding: it ties the
@@ -113,7 +127,7 @@ signed, base64-encoded. When present (`computeImagePhash` in `src/server.ts`):
 
 `imageBase64` is optional — an `/attest` call without it still succeeds exactly as before, just
 with no findable AMBER evidence for that photo later. The request body is capped at 30MB
-(`MAX_BODY_BYTES` in `src/server.ts`) to bound memory use from a malformed/hostile upload.
+(`MAX_BODY_BYTES` in `src/http.ts`) to bound memory use from a malformed/hostile upload.
 
 Live-tested end to end against real devnet + real Atlas: attested a real synthetic JPEG (the
 on-chain `phash` came back non-zero, e.g. `9a7fff7fffffffff`), then a *never-attested*
@@ -143,7 +157,7 @@ candidate-narrowing step instead of a full collection scan.
 - **`AMBER_HAMMING_THRESHOLD = 10`** (`src/mongo.ts`) is a placeholder — ROADMAP Rung 2's real
   Instagram round-trip experiment hasn't been run yet. 10 is picked conservatively from
   `tests/phash.test.ts`'s synthetic evidence (derivatives measure ≤8, unrelated images ≥16).
-- **`POST /verify`** (`src/server.ts`) ties it together: GREEN first (exact chain read) →
+- **`POST /verify`** (`src/http.ts`) ties it together: GREEN first (exact chain read) →
   AMBER (`findAmberCandidates`, then **every candidate is re-read from the chain via
   `lookupAttestation` before being returned** — a Mongo-only match is never trusted) → GREY.
   Live-tested: a query phash 3 bits from a real indexed record correctly returns
