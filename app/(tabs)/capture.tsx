@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Image, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { Image, Linking, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import RegistrationFrame from "@/components/RegistrationFrame";
 import LedgerRow from "@/components/LedgerRow";
 import { GhostButton } from "@/components/Buttons";
 import { sha256Bytes, attestPhoto, type CaptureManifest } from "@/lib/registry";
 import { getDeviceIdentity, signManifest, truncatePubkey } from "@/lib/deviceKey";
+import { canonicalManifestBytes } from "@/lib/manifest";
+import { formatUnixSeconds } from "@/lib/solana";
 
 type Phase = "viewfinder" | "anchoring" | "anchored";
 
@@ -55,6 +57,7 @@ function NativeCapture() {
   const [phase, setPhase] = useState<Phase>("viewfinder");
   const [checklistStep, setChecklistStep] = useState(0);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [anchorError, setAnchorError] = useState<string | null>(null);
   const [anchorResult, setAnchorResult] = useState<{
     txSignature: string;
     explorerUrl: string;
@@ -71,38 +74,41 @@ function NativeCapture() {
     const photo = await cameraRef.current.takePictureAsync({ quality: 1 });
     if (!photo) return;
     setPhotoUri(photo.uri);
+    setAnchorError(null);
     setPhase("anchoring");
     setChecklistStep(0);
 
-    const bytes = await loadBytes(photo.uri);
-    const sha256 = await sha256Bytes(bytes);
-    setChecklistStep(1);
-    await sleep(300);
+    try {
+      const bytes = await loadBytes(photo.uri);
+      const sha256 = await sha256Bytes(bytes);
+      setChecklistStep(1);
+      await sleep(300);
 
-    const manifest: CaptureManifest = {
-      sha256,
-      timestamp: new Date().toISOString(),
-      devicePubkey: pubkeyHex,
-    };
-    const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest));
-    const signature = await signManifest(manifestBytes);
-    setChecklistStep(2);
-    await sleep(300);
+      const timestamp = Math.floor(Date.now() / 1000);
+      const manifest: CaptureManifest = { sha256, timestamp, devicePubkey: pubkeyHex };
+      const manifestBytes = canonicalManifestBytes(sha256, timestamp, pubkeyHex);
+      const signature = await signManifest(manifestBytes);
+      setChecklistStep(2);
 
-    const { txSignature, explorerUrl } = await attestPhoto(manifest, signature);
-    setAnchorResult({
-      txSignature,
-      explorerUrl,
-      sha256,
-      timestamp: manifest.timestamp,
-    });
-    setPhase("anchored");
+      const { txSignature, explorerUrl } = await attestPhoto(manifest, signature);
+      setAnchorResult({
+        txSignature,
+        explorerUrl,
+        sha256,
+        timestamp: formatUnixSeconds(timestamp),
+      });
+      setPhase("anchored");
+    } catch (err) {
+      setAnchorError(err instanceof Error ? err.message : "Anchoring failed.");
+      setPhase("viewfinder");
+    }
   }
 
   function reset() {
     setPhase("viewfinder");
     setPhotoUri(null);
     setAnchorResult(null);
+    setAnchorError(null);
   }
 
   if (!permission) {
@@ -147,6 +153,11 @@ function NativeCapture() {
           <Text className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest">
             SIGNED AT CAPTURE · ANCHORED ON SOLANA
           </Text>
+          {anchorError && (
+            <Text className="font-mono text-[10px] text-verdict-amber text-center px-8">
+              {anchorError}
+            </Text>
+          )}
         </View>
       </View>
     );
@@ -203,7 +214,10 @@ function NativeCapture() {
               <LedgerRow label="CAPTURED" value={anchorResult.timestamp} />
               <LedgerRow label="TRANSACTION" value={anchorResult.txSignature} last />
             </View>
-            <GhostButton label="VIEW ON EXPLORER ↗" />
+            <GhostButton
+              label="VIEW ON EXPLORER ↗"
+              onPress={() => Linking.openURL(anchorResult.explorerUrl)}
+            />
           </View>
         </View>
         <GhostButton label="CAPTURE ANOTHER PHOTO" onPress={reset} />

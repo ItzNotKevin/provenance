@@ -1,4 +1,4 @@
-import { Image, Text, View } from "react-native";
+import { Image, Linking, Text, View } from "react-native";
 import RegistrationFrame from "@/components/RegistrationFrame";
 import LedgerRow from "@/components/LedgerRow";
 import VerdictBlock from "@/components/VerdictBlock";
@@ -35,7 +35,10 @@ export default function VerdictView({
           <LedgerRow label="DEVICE KEY" value={r.devicePubkey} />
           <LedgerRow label="TRANSACTION" value={r.txSignature} last />
         </View>
-        <GhostButton label="VIEW ON SOLANA EXPLORER ↗" />
+        <GhostButton
+          label="VIEW ON SOLANA EXPLORER ↗"
+          onPress={() => Linking.openURL(r.explorerUrl)}
+        />
         {onReset && <GhostButton label="VERIFY ANOTHER PHOTO" onPress={onReset} />}
       </View>
     );

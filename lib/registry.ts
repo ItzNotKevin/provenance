@@ -42,61 +42,36 @@ export async function sha256Bytes(bytes: Uint8Array): Promise<string> {
   return bytesToHex(new Uint8Array(digest));
 }
 
-function truncateKey(hex: string): string {
-  return `${hex.slice(0, 4)}…${hex.slice(-4)}`;
-}
-
-function fakeRecordForHash(hash: string): AttestationRecord {
-  const now = new Date();
-  return {
-    sha256: hash,
-    capturedAt: now.toISOString().replace("T", " ").slice(0, 19) + " UTC",
-    devicePubkey: truncateKey(hash.slice(2, 10) + hash.slice(-8)),
-    txSignature: truncateKey(hash.slice(4, 12) + hash.slice(-12)),
-    explorerUrl: `https://explorer.solana.com/tx/${hash.slice(0, 32)}`,
-  };
-}
-
 /**
- * Looks up a hash in the attestation registry.
- * TODO: real chain call — replace with a Solana program account lookup
- * keyed by the SHA-256 digest, resolving the on-chain attestation PDA.
+ * Looks up a hash in the attestation registry: a real devnet read of the
+ * content-addressed PDA (see lib/solana.ts, program/README.md). GREEN if the
+ * PDA exists, GREY if it doesn't. AMBER (pHash backend match) isn't wired yet —
+ * that needs the Mongo-backed matching described in lib/CLAUDE.md.
  */
 export async function lookupHash(hash: string): Promise<Verdict> {
-  await new Promise((resolve) => setTimeout(resolve, 1500));
-
-  const lastDigit = hash.slice(-1).toLowerCase();
-  const isEven = "02468ace".includes(lastDigit);
-
-  if (isEven) {
-    return { tier: "green", record: fakeRecordForHash(hash) };
-  }
-  return { tier: "grey" };
+  const { realLookupHash } = await import("@/lib/solana");
+  return realLookupHash(hash);
 }
 
 export interface CaptureManifest {
   sha256: string;
-  timestamp: string;
+  /** Unix seconds — must match the canonical signed message exactly. */
+  timestamp: number;
   devicePubkey: string;
 }
 
 /**
- * Submits a signed capture manifest for on-chain anchoring.
- * TODO: real chain call — replace with a Solana transaction that writes
- * the manifest + signature into a new attestation account.
+ * Submits a signed capture manifest as a real devnet transaction: a native
+ * Ed25519 verify instruction (over the canonical bytes the device signed) plus
+ * attest_photo, which introspects that verify and creates the PDA. See
+ * lib/solana.ts and program/README.md.
  */
 export async function attestPhoto(
   manifest: CaptureManifest,
   signature: string
 ): Promise<{ txSignature: string; explorerUrl: string }> {
-  await new Promise((resolve) => setTimeout(resolve, 2000));
-
-  const seed = manifest.sha256 + signature;
-  const txSignature = truncateKey(seed.slice(0, 20) + seed.slice(-20));
-  return {
-    txSignature,
-    explorerUrl: `https://explorer.solana.com/tx/${seed.slice(0, 32)}`,
-  };
+  const { realAttestPhoto } = await import("@/lib/solana");
+  return realAttestPhoto(manifest, signature);
 }
 
 /**

@@ -1,10 +1,16 @@
 import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
+import * as Crypto from "expo-crypto";
 import nacl from "tweetnacl";
 
 if (Platform.OS !== "web") {
-  // Polyfills global.crypto.getRandomValues, which tweetnacl needs for keygen.
-  require("react-native-get-random-values");
+  // react-native-get-random-values needs native code Expo Go doesn't ship with,
+  // so tweetnacl's own "no PRNG" fallback throws there. expo-crypto is a
+  // first-party module Expo Go does bundle — use it as tweetnacl's RNG source.
+  nacl.setPRNG((buffer, length) => {
+    const random = Crypto.getRandomBytes(length);
+    buffer.set(random);
+  });
 }
 
 const STORAGE_KEY = "verify_system_device_secret_key";
