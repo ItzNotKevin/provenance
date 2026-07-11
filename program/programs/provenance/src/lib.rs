@@ -200,3 +200,28 @@ fn verify_ed25519(
         return Ok(());
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn canonical_message_layout() {
+        let sha = [7u8; 32];
+        let ts: i64 = 1_700_000_000;
+        let pk = Pubkey::new_from_array([9u8; 32]);
+        let msg = canonical_message(&sha, ts, &pk);
+
+        // sha256(32) ‖ timestamp_i64_LE(8) ‖ device_pubkey(32) = 72 bytes.
+        // Keep this identical to lib/manifest.ts canonicalManifestBytes().
+        assert_eq!(msg.len(), 72);
+        assert_eq!(&msg[0..32], &sha);
+        assert_eq!(&msg[32..40], &ts.to_le_bytes());
+        assert_eq!(&msg[40..72], &pk.to_bytes());
+    }
+
+    #[test]
+    fn account_size_is_exact() {
+        assert_eq!(PhotoAttestation::MAX_SIZE, 32 + 8 + 32 + 8 + 33 + 8 + 1);
+    }
+}

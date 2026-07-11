@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Shared pre-push hook: runs the fast offline test suite before anything leaves your
+# machine. Costs $0 (no Claude, no network). Enabled for everyone via core.hooksPath,
+# which `npm install` sets (postinstall). Bypass in an emergency with `git push --no-verify`.
+set -euo pipefail
+echo "pre-push: running fast test suite (scripts/test.sh)…"
+exec bash "$(git rev-parse --show-toplevel)/scripts/test.sh"

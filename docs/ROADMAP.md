@@ -68,6 +68,8 @@ embeddings → extension → edit lineage → geohash → amber.
 - [ ] Edit lineage (child attestations: "cropped from verified original")
 
 ### Rung 10 — Threaded to the end
+- [x] Test suite scaffolding: `npm test` (TS: pHash + signing contract) + `npm run test:all` (adds Rust); pre-push hook + GitHub Actions CI — all offline, $0
+  - [ ] **Expand coverage as we build** (current suite only covers pHash + signing): backend `/verify` tiers + chain-confirmation, de-stubbed `lib/registry.ts`, new program instructions (edit lineage), extension. Add tests in the same change as each feature.
 - [ ] Demo-proofing: HEIC / large files / malformed input / graceful no-match / RPC fallback / loading states (judges WILL try to break it)
 - [ ] Pitch script written + rehearsed (2 people: one drives, one narrates)
 - [ ] Venue Wi-Fi contingency (RPC retry + cached fallback)

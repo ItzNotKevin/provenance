@@ -95,13 +95,35 @@ npm run web        # web build (VERIFY-ONLY — capture is disabled on web by de
 
 ## Verifying changes
 
-There is no CI. To verify a nontrivial change, **drive the actual flow**, don't just typecheck:
+**Fast test suite (offline, $0 — no Claude, no network). Run it after any change:**
 
-1. `npx tsc --noEmit` for type safety (fast sanity check).
-2. `npm start`, open on device/simulator, and exercise the affected tab end-to-end.
+```bash
+npm test          # TypeScript unit tests (pHash + canonical signing contract) — ~0.2s
+npm run test:all  # the above + Rust program unit tests (needs cargo) — the full fast suite
+```
+
+- A shared **`pre-push` git hook** runs `scripts/test.sh` automatically before every push
+  (enabled for everyone by `npm install` → `postinstall` sets `core.hooksPath .githooks`; bypass in
+  an emergency with `git push --no-verify`).
+- **GitHub Actions CI** (`.github/workflows/ci.yml`) is the authoritative gate on push/PR — can't be
+  `--no-verify`'d past. Also free / zero AI credits.
+- Tests live in [tests/](tests/) (`*.test.ts`, `node --test`) and inline `#[cfg(test)]` in the program.
+  Add a test with the change that needs it. **The devnet smoke test (`cd program && npm run smoke`) is
+  NOT in the fast suite** — it needs network + faucet SOL; run it manually when touching the program.
+
+> ⚠️ **Coverage is a starting point, not complete — grow it as the codebase expands.** Today the suite
+> covers only the pure logic that exists: the pHash core and the canonical signing contract (+ the
+> program's message layout). Whole areas have **no tests yet** and need them as they land: the backend
+> (`/verify` three-tier logic, chain-confirmation, Mongo indexing), the real `lib/registry.ts` calls
+> once de-stubbed, additional program instructions (edit lineage / `parent_hash`), and the Chrome
+> extension. **When you add a feature, add its tests in the same change** — treat a new module without
+> tests as unfinished.
+
+Tests don't replace driving the app. For a nontrivial UI/flow change also:
+1. `npx tsc --noEmit` for type safety.
+2. `npm start`, open on device/simulator, exercise the affected tab.
 3. For the core spine, the acceptance arc is the **milestone gate** (plan §9 step 8):
-   **capture a photo → get GREEN → change one pixel → get RED/GREY.** If that arc works, the spine
-   is real. Nothing else ships until it does.
+   **capture a photo → get GREEN → change one pixel → get RED/GREY.**
 
 ## Repo map
 
@@ -126,8 +148,13 @@ lib/
   deviceKey.ts             Ed25519 keypair (tweetnacl), secure-store persist, signManifest  ← REAL
   registry.ts             sha256Bytes (REAL) + lookupHash/attestPhoto/recentAttestations (FAKE)
   phash.ts                 DCT perceptual hash core for the amber tier (pure)              ← REAL
+  manifest.ts              canonical signed-message builder (mirrors the on-chain format)  ← REAL
+tests/                     fast offline unit tests (node --test): phash.test.ts, manifest.test.ts
 scripts/
-  phash-check.ts           node scripts/phash-check.ts — verifies pHash properties
+  phash-check.ts           node scripts/phash-check.ts — human-readable pHash demo
+  test.sh                  full fast suite (TS + Rust); run by the pre-push hook + CI
+.githooks/pre-push         runs scripts/test.sh before push (enabled via core.hooksPath)
+.github/workflows/ci.yml   CI: TS + Rust tests on push/PR (the authoritative gate)
 program/                   Anchor/Solana program (DEPLOYED to devnet)
   programs/provenance/src/lib.rs   attest_photo instruction, PhotoAttestation PDA, ed25519 verify
   build.sh / deploy.sh     the working build/deploy recipe (use these, NOT `anchor build`)

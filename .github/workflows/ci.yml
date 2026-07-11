@@ -1,0 +1,33 @@
+name: CI
+
+# The authoritative gate — runs on every push/PR, can't be bypassed with --no-verify.
+# Free GitHub-hosted runners; no Claude/AI involved, so zero credits.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  typescript:
+    name: TypeScript unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24" # 24 strips TS types with no flag (node --test tests/*.test.ts)
+      - run: npm ci
+      - run: npm test
+
+  rust:
+    name: Rust program unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: program
+      - name: cargo test
+        working-directory: program
+        run: cargo test
