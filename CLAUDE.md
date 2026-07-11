@@ -45,9 +45,11 @@ the central task of "continuing the work." See [lib/CLAUDE.md](lib/CLAUDE.md) fo
 - Build/deploy/test: `cd program && ./build.sh && ./deploy.sh && npm run smoke` — **do NOT use
   `anchor build`** (it force-downgrades Solana to a rust that can't compile modern crates; the
   toolchain war is documented in [program/README.md](program/README.md)).
-- **Next chain task:** the app signs JSON but the program verifies a fixed byte layout
-  (`sha256‖timestamp_i64LE‖devicePubkey`) — update `signManifest` in `app/(tabs)/capture.tsx` to match
-  before wiring real capture. This is the last app↔chain gap.
+- **App↔chain signing gap closed:** `app/(tabs)/capture.tsx` now signs the canonical fixed-byte
+  layout (`sha256‖timestamp_i64LE‖devicePubkey`) via `lib/manifest.ts` → `canonicalManifestBytes`,
+  matching `canonical_message` in `program/programs/provenance/src/lib.rs`. Not yet devnet-tested
+  from the real app (still blocked on the backend, which builds the paired Ed25519 precompile
+  instruction and submits the transaction — see Rung 6 in `docs/ROADMAP.md`).
 
 ## How to run
 

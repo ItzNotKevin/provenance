@@ -43,7 +43,7 @@ embeddings → extension → edit lineage → geohash → amber.
 - [x] Ed25519 sig verification via instruction-sysvar introspection *(written; MUST be devnet-tested)*
 - [x] Reject duplicates (via `init` on the hash-seeded PDA)
 - [ ] **Install toolchain + `anchor build`/`deploy` to devnet** (Rung 1 — the real blocker; needs Alan's machine)
-- [ ] **Switch app signing to the canonical fixed-byte layout** (app signs JSON today — see program/README.md)
+- [x] Switch app signing to the canonical fixed-byte layout (see `lib/manifest.ts` → `canonicalManifestBytes`, wired into `app/(tabs)/capture.tsx`)
 - [ ] `@solana/web3.js` + Anchor-generated TS client (backend builds the 2-ix tx: ed25519 verify + attest_photo)
 
 ### Rung 6 — Backend + verifier (Node/TS, Next.js, MongoDB Atlas M0)

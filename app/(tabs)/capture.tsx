@@ -6,6 +6,7 @@ import LedgerRow from "@/components/LedgerRow";
 import { GhostButton } from "@/components/Buttons";
 import { sha256Bytes, attestPhoto, type CaptureManifest } from "@/lib/registry";
 import { getDeviceIdentity, signManifest, truncatePubkey } from "@/lib/deviceKey";
+import { canonicalManifestBytes } from "@/lib/manifest";
 
 type Phase = "viewfinder" | "anchoring" | "anchored";
 
@@ -79,12 +80,13 @@ function NativeCapture() {
     setChecklistStep(1);
     await sleep(300);
 
+    const unixSeconds = Math.floor(Date.now() / 1000);
     const manifest: CaptureManifest = {
       sha256,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(unixSeconds * 1000).toISOString(),
       devicePubkey: pubkeyHex,
     };
-    const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest));
+    const manifestBytes = canonicalManifestBytes(sha256, unixSeconds, pubkeyHex);
     const signature = await signManifest(manifestBytes);
     setChecklistStep(2);
     await sleep(300);
