@@ -32,7 +32,7 @@ The Chrome extension described in the plan does not exist yet.
 | **Verify: GREEN/GREY lookup** | §3.3 | ✅ **Real** — `lib/solana.ts` reads the PDA directly, no database |
 | Registry list + record detail | §3.2 | ✅ **UI built** — list still reads fake data |
 | **On-chain Anchor program** | §3.2 | ✅ **Deployed to devnet + smoke-tested** — `program/` (id `EoWdD…jZ8g`) |
-| **Backend: `attestPhoto`** | §3.3 | 🟡 **Built, verified by simulation, blocked on funding** — `backend/` (see `backend/README.md`) |
+| **Backend API** | §3.3 | 🟡 **`POST /attest` built but blocked on funding; `GET /lookup/:sha256` live** — `backend/` (see `backend/README.md`) |
 | **pHash core** | §4 | ✅ **Built + verified** — `lib/phash.ts` (`scripts/phash-check.ts` passes) |
 | **Amber tier wiring** | §4 | ❌ **Not started** — amber UI exists; needs the pHash + Mongo backend match described in `lib/CLAUDE.md` |
 | **Chrome extension** | §3.4 | ❌ **Not started** |
