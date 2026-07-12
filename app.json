@@ -39,6 +39,14 @@
         {
           "cameraPermission": "PROVENANCE uses the camera to capture and cryptographically sign photos at the moment of capture."
         }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "PROVENANCE reads the exact original file of a photo you select, so verification checks the real bytes instead of a re-compressed copy.",
+          "savePhotosPermission": "PROVENANCE saves captured photos to your library so you can verify them later.",
+          "isAccessMediaLocationEnabled": false
+        }
       ]
     ]
   }

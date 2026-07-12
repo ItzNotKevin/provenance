@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import * as MediaLibrary from "expo-media-library";
 import RegistrationFrame from "@/components/RegistrationFrame";
 import VerdictView from "@/components/VerdictView";
 import { PrimaryButton, GhostButton } from "@/components/Buttons";
@@ -40,29 +41,41 @@ export default function VerifyScreen() {
   const [showUrlField, setShowUrlField] = useState(false);
   const [urlValue, setUrlValue] = useState("");
 
-  async function runVerification(uri: string) {
+  /**
+   * `displayUri` renders the preview (always safe — any URI works for <Image>).
+   * `hashUri`, if different, is what actually gets hashed. They diverge when the
+   * picker had to re-export a preview copy but we resolved the true asset file
+   * separately (see handleSelectPhoto) — hashing the re-exported copy would give
+   * a different SHA-256 than the original, unforgeably-attested bytes.
+   */
+  async function runVerification(displayUri: string, hashUri: string = displayUri) {
     setError(null);
-    setImageUri(uri);
+    setImageUri(displayUri);
     setPhase("verifying");
     setStepIndex(0);
     try {
-      const bytes = await loadBytes(uri);
+      console.log("[verify] hashing from:", hashUri);
+      const bytes = await loadBytes(hashUri);
+      console.log("[verify] bytes length:", bytes.length);
       const hash = await sha256Bytes(bytes);
+      console.log("[verify] computed sha256:", hash);
       setStepIndex(1);
       await sleep(350);
       setStepIndex(2);
-      const result = await lookupHash(hash);
+      const result = await lookupHash(hash, bytes);
+      console.log("[verify] result tier:", result.tier);
       setVerdict(result);
       setPhase("result");
-    } catch {
+    } catch (err) {
+      console.log("[verify] runVerification failed:", err);
       setError("Could not read that image. Try another photo or URL.");
       setPhase("idle");
     }
   }
 
   async function handleSelectPhoto() {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
+    const pickerPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!pickerPermission.granted) {
       setError("Photo library access is required to verify an image.");
       return;
     }
@@ -70,9 +83,35 @@ export default function VerifyScreen() {
       mediaTypes: ["images"],
       quality: 1,
     });
-    if (!result.canceled && result.assets[0]) {
-      runVerification(result.assets[0].uri);
+    if (result.canceled || !result.assets[0]) return;
+
+    const picked = result.assets[0];
+    console.log("[verify] picker returned uri:", picked.uri, "assetId:", picked.assetId);
+
+    // The picker re-exports/re-compresses whatever it returns — even at quality 1,
+    // it's rarely byte-identical to the original file. Resolve the real stored
+    // asset via MediaLibrary and hash *that* instead, so verifying a photo you
+    // just captured (or received unmodified through a byte-preserving channel,
+    // e.g. AirDrop/Mail/Files) actually matches its on-chain attestation exactly.
+    if (picked.assetId) {
+      try {
+        const libraryPermission = await MediaLibrary.requestPermissionsAsync();
+        console.log("[verify] MediaLibrary permission granted:", libraryPermission.granted);
+        if (libraryPermission.granted) {
+          const info = await MediaLibrary.getAssetInfoAsync(picked.assetId);
+          console.log("[verify] resolved asset localUri:", info.localUri);
+          if (info.localUri) {
+            runVerification(picked.uri, info.localUri);
+            return;
+          }
+        }
+      } catch (err) {
+        console.log("[verify] MediaLibrary asset resolution failed:", err);
+        // Fall through to hashing the picker's own copy below.
+      }
     }
+
+    runVerification(picked.uri);
   }
 
   function handleSubmitUrl() {

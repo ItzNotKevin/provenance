@@ -10,6 +10,7 @@ import {
   type GestureResponderEvent,
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as MediaLibrary from "expo-media-library";
 import { Ionicons } from "@expo/vector-icons";
 import RegistrationFrame from "@/components/RegistrationFrame";
 import LedgerRow from "@/components/LedgerRow";
@@ -99,6 +100,11 @@ function NativeCapture() {
 
   useEffect(() => {
     getDeviceIdentity().then((id) => setPubkeyHex(id.publicKeyHex));
+    // Requested up front so it's already resolved by the time the shutter is
+    // tapped. Full (not write-only) permission: capture reads back the saved
+    // asset's localUri to hash the exact bytes iOS actually stored (see
+    // handleShutter) — not just adds a new one.
+    MediaLibrary.requestPermissionsAsync().catch(() => {});
     return () => {
       if (longPressTimer.current) clearTimeout(longPressTimer.current);
       if (reticleFadeTimer.current) clearTimeout(reticleFadeTimer.current);
@@ -201,8 +207,27 @@ function NativeCapture() {
     setChecklistStep(0);
 
     try {
-      const bytes = await loadBytes(photo.uri);
+      // Save to the camera roll BEFORE hashing, then hash back whatever iOS/Android
+      // actually stored (not the pre-save temp file). Photos-library writes can get
+      // silently re-encoded on import (confirmed empirically — a save produced a file
+      // ~1/3 the size of the original capture) — attesting the post-save bytes means
+      // the certificate always matches the artifact that actually persists and gets
+      // shared/re-verified later, instead of a temp file nobody will ever see again.
+      let hashSourceUri = photo.uri;
+      try {
+        const asset = await MediaLibrary.createAssetAsync(photo.uri);
+        const info = await MediaLibrary.getAssetInfoAsync(asset.id);
+        if (info.localUri) {
+          hashSourceUri = info.localUri;
+        }
+      } catch (err) {
+        console.warn("Could not save to library — hashing the unsaved capture instead:", err);
+      }
+
+      setPhotoUri(hashSourceUri);
+      const bytes = await loadBytes(hashSourceUri);
       const sha256 = await sha256Bytes(bytes);
+      console.log("[capture] attested sha256:", sha256, "bytes length:", bytes.length, "source:", hashSourceUri);
       setChecklistStep(1);
       await sleep(300);
 

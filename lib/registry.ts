@@ -50,15 +50,15 @@ function truncateKey(hex: string): string {
 /**
  * Looks up a hash in the attestation registry: a real devnet read of the
  * content-addressed PDA (see lib/solana.ts, program/README.md) — no database,
- * the address is derived from the hash. GREEN if the PDA exists, GREY if it
- * doesn't or the RPC is unreachable (never a false positive). AMBER (pHash
- * backend match) isn't wired yet — that needs the Mongo-backed matching
- * described in lib/CLAUDE.md.
+ * the address is derived from the hash. GREEN if the PDA exists. If `imageBytes`
+ * is provided and the direct read misses, falls through to the backend's
+ * chain-confirmed AMBER (pHash) match before giving up — GREY if neither finds
+ * anything, or if the RPC is unreachable (never a false positive).
  */
-export async function lookupHash(hash: string): Promise<Verdict> {
+export async function lookupHash(hash: string, imageBytes?: Uint8Array): Promise<Verdict> {
   try {
     const { realLookupHash } = await import("@/lib/solana");
-    return await realLookupHash(hash);
+    return await realLookupHash(hash, imageBytes);
   } catch (err) {
     console.warn("lookupHash: chain read failed, reporting grey", err);
     return { tier: "grey" };

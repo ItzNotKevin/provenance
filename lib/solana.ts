@@ -9,6 +9,7 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { hexToBytes, bytesToHex } from "@/lib/manifest";
 import { PROGRAM_ID, DEVNET_RPC_URL, CLUSTER_QUERY } from "@/lib/solanaConfig";
+import { BACKEND_URL, USE_FAKE_REGISTRY } from "@/lib/config";
 import type { AttestationRecord, Verdict } from "@/lib/registry";
 
 const programId = new PublicKey(PROGRAM_ID);
@@ -62,17 +63,75 @@ function decodePhotoAttestation(data: Buffer): DecodedAttestation {
   return { sha256, phash, devicePubkey, timestamp, slot };
 }
 
+interface BackendVerifyResponse {
+  tier: "green" | "amber";
+  record: {
+    sha256: string;
+    devicePubkey: string;
+    timestamp: number;
+    explorerUrl: string;
+  };
+  hammingDistance?: number;
+}
+
+function truncateKey(hex: string): string {
+  return `${hex.slice(0, 4)}…${hex.slice(-4)}`;
+}
+
+/**
+ * AMBER fallback: asks the backend's chain-confirmed /verify (pHash + Atlas Vector
+ * Search, see backend/src/http.ts) whether this photo is a near-duplicate of an
+ * attested original — the case a direct GREEN chain read can never catch, since any
+ * re-encode (a photo-library round-trip, a lossy share) changes the SHA-256 even
+ * though the image is visually identical. Best-effort: any failure here (no
+ * backend, no network, fake-registry mode) just means AMBER isn't available, not
+ * that verification itself failed — the caller already has a real GREY answer.
+ */
+async function tryBackendVerify(sha256Hex: string, imageBytes: Uint8Array): Promise<Verdict | null> {
+  if (USE_FAKE_REGISTRY) return null;
+  try {
+    const { bytesToBase64 } = await import("@/lib/deviceKey");
+    const response = await fetch(`${BACKEND_URL}/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sha256: sha256Hex, imageBase64: bytesToBase64(imageBytes) }),
+    });
+    if (!response.ok) return null;
+    const body: BackendVerifyResponse = await response.json();
+    if (body.tier !== "amber") return null;
+
+    const record: AttestationRecord = {
+      sha256: body.record.sha256,
+      capturedAt: formatUnixSeconds(body.record.timestamp),
+      devicePubkey: truncateKey(body.record.devicePubkey),
+      txSignature: "unknown",
+      explorerUrl: body.record.explorerUrl,
+    };
+    return { tier: "amber", record };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Reads the on-chain PDA for this hash. GREEN if it exists (pure chain read,
- * unforgeable), GREY if it doesn't. Never a judgment beyond "found" / "not found".
+ * unforgeable). If not, and image bytes are available, falls through to the
+ * backend's chain-confirmed AMBER match before giving up. GREY otherwise — never
+ * a judgment beyond "no exact or near match found."
  */
-export async function realLookupHash(sha256Hex: string): Promise<Verdict> {
+export async function realLookupHash(sha256Hex: string, imageBytes?: Uint8Array): Promise<Verdict> {
   const conn = getConnection();
   const sha256 = hexToBytes(sha256Hex);
   const pda = deriveAttestationPda(sha256);
 
   const account = await conn.getAccountInfo(pda, "confirmed");
-  if (!account) return { tier: "grey" };
+  if (!account) {
+    if (imageBytes) {
+      const amber = await tryBackendVerify(sha256Hex, imageBytes);
+      if (amber) return amber;
+    }
+    return { tier: "grey" };
+  }
 
   const decoded = decodePhotoAttestation(account.data);
 
@@ -83,8 +142,8 @@ export async function realLookupHash(sha256Hex: string): Promise<Verdict> {
   const record: AttestationRecord = {
     sha256: bytesToHex(decoded.sha256),
     capturedAt: formatUnixSeconds(decoded.timestamp),
-    devicePubkey: devicePubkeyHex.slice(0, 4) + "…" + devicePubkeyHex.slice(-4),
-    txSignature: txSignature === "unknown" ? "unknown" : txSignature.slice(0, 4) + "…" + txSignature.slice(-4),
+    devicePubkey: truncateKey(devicePubkeyHex),
+    txSignature: txSignature === "unknown" ? "unknown" : truncateKey(txSignature),
     explorerUrl: txSignature === "unknown" ? explorerTxUrl(pda.toBase58()) : explorerTxUrl(txSignature),
   };
 

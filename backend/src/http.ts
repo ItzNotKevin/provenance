@@ -82,6 +82,10 @@ function isAttestRequestBody(body: unknown): body is AttestRequestBody {
 interface VerifyRequestBody {
   sha256: string;
   phash?: string;
+  /** Raw image bytes (base64), for clients that can't compute pHash on-device (see lib/CLAUDE.md's
+   *  v1 decision — native has no cheap raw-pixel API). Mirrors /attest's imageBase64 pattern:
+   *  verified against `sha256` before anything is computed from it. Takes priority over `phash`. */
+  imageBase64?: string;
 }
 
 const PHASH_HEX = /^[0-9a-fA-F]{16}$/;
@@ -89,7 +93,30 @@ const PHASH_HEX = /^[0-9a-fA-F]{16}$/;
 function isVerifyRequestBody(body: unknown): body is VerifyRequestBody {
   if (typeof body !== "object" || body === null) return false;
   const b = body as Record<string, unknown>;
-  return typeof b.sha256 === "string" && (b.phash === undefined || typeof b.phash === "string");
+  return (
+    typeof b.sha256 === "string" &&
+    (b.phash === undefined || typeof b.phash === "string") &&
+    (b.imageBase64 === undefined || typeof b.imageBase64 === "string")
+  );
+}
+
+/**
+ * Resolves the pHash to search AMBER candidates with: prefers computing it server-side from
+ * uploaded image bytes (verified against the given sha256 first, same binding as /attest's
+ * computeImagePhash), falling back to a client-supplied hex phash. Returns undefined if neither
+ * was provided — callers skip AMBER entirely in that case, same as before this existed.
+ */
+async function resolveVerifyPhash(body: VerifyRequestBody, sha256Hex: string): Promise<string | undefined> {
+  if (!body.imageBase64) return body.phash?.toLowerCase();
+
+  const bytes = Buffer.from(body.imageBase64, "base64");
+  const actualSha256 = createHash("sha256").update(bytes).digest("hex");
+  if (actualSha256 !== sha256Hex) {
+    throw new InvalidHashError(
+      "uploaded image bytes do not hash to the given sha256 — refusing to compute pHash from unrelated bytes"
+    );
+  }
+  return computePhashFromImageBytes(bytes);
 }
 
 export interface RequestHandlerDependencies {
@@ -268,7 +295,7 @@ async function handleVerify(
     return sendJson(res, 400, { error: (err as Error).message });
   }
   if (!isVerifyRequestBody(body)) {
-    return sendJson(res, 400, { error: "expected { sha256, phash? }" });
+    return sendJson(res, 400, { error: "expected { sha256, phash?, imageBase64? }" });
   }
   if (body.phash !== undefined && !PHASH_HEX.test(body.phash)) {
     return sendJson(res, 400, { error: "phash must be 16 hex characters" });
@@ -284,14 +311,27 @@ async function handleVerify(
     throw err;
   }
 
+  let effectivePhash: string | undefined;
+  try {
+    effectivePhash = await resolveVerifyPhash(body, sha256Hex);
+  } catch (err) {
+    if (err instanceof InvalidHashError) {
+      return sendJson(res, 400, { error: err.message });
+    }
+    if (err instanceof ImageDecodeError) {
+      return sendJson(res, 400, { error: err.message });
+    }
+    throw err;
+  }
+
   try {
     const green = await deps.lookupAttestation(sha256Hex);
     if (green) return sendJson(res, 200, { tier: "green", record: green });
 
-    if (body.phash) {
+    if (effectivePhash) {
       let candidates: Awaited<ReturnType<typeof deps.findAmberCandidates>> = [];
       try {
-        candidates = await deps.findAmberCandidates(body.phash.toLowerCase(), { limit: 5 });
+        candidates = await deps.findAmberCandidates(effectivePhash, { limit: 5 });
       } catch (err) {
         if (!(err instanceof MongoNotConfiguredError)) throw err;
         // feature disabled — fall through to GREY rather than treating it as a failure
@@ -332,6 +372,11 @@ export function createRequestHandler(
 
   return (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
+    const requestId = Math.random().toString(36).slice(2, 8);
+    console.log(`[${requestId}] ${req.method} ${url.pathname} from ${req.socket.remoteAddress}`);
+    res.on("finish", () => {
+      console.log(`[${requestId}] -> ${res.statusCode}`);
+    });
 
     if (req.method === "POST" && url.pathname === "/attest") {
       void handleAttest(req, res, dependencies);
