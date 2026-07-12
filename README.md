@@ -13,6 +13,35 @@ Unlike AI-detector guesswork, Provenance never guesses. A photo either matches a
 - 👁️ **Survives recompression:** A perceptual hash (64-bit DCT pHash) is computed from the exact signed bytes at ingest and baked into the immutable on-chain record — so a recompressed or resized repost can still be traced back to its verified original via MongoDB Atlas Vector Search.
 - 🧾 **Rebuildable registry:** The browsable registry is a Mongo mirror of the chain. A reindex script can rebuild it from scratch by scanning on-chain accounts — the chain is always the source of truth.
 
+## Architecture
+```
+        CAPTURE PATH                               VERIFY PATH
+  ┌──────────────────────┐                 ┌──────────────────────┐
+  │  Device (app)        │                 │  App / Chrome        │
+  │  camera → SHA-256    │                 │  hash photo / URL    │
+  │  Ed25519 sign        │                 └──────────┬───────────┘
+  │  72-byte manifest    │                            │
+  └──────────┬───────────┘                 derive PDA ["photo", sha256]
+             │ POST /attest                           │
+             ▼                                        ▼
+  ┌──────────────────────┐                 ┌──────────────────────┐
+  │  Backend (Node)      │                 │  Solana read         │──► 🟢 GREEN (byte-exact)
+  │  verify sig          │                 │  PDA exists? decode  │──► ⚪ GREY  (no record)
+  │  compute pHash       │                 └──────────┬───────────┘
+  │  fee-payer sponsor   │                       miss │ POST /verify
+  └─────┬───────────┬────┘                            ▼
+        │ 2-ix tx   │ index                 ┌──────────────────────┐
+        ▼           ▼                       │  Atlas Vector        │
+  ┌───────────┐  ┌───────────┐              │  Search (pHash ANN)  │
+  │  Solana   │  │  Mongo    │              │  → chain-confirm ────│──► 🟠 AMBER (recompressed)
+  │  program  │╌►│  mirror   │              └──────────────────────┘
+  │  re-verify│  │  registry │
+  │  mint PDA │  └───────────┘
+  └───────────┘
+  chain is the source of truth ─ ╌► reindex: getProgramAccounts replays every
+  on-chain record to rebuild the Mongo mirror from scratch
+```
+
 ## The Three-Tier Verdict
 Every verification returns exactly one of three honest answers — never a fake "verified":
 
