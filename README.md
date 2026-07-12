@@ -1,4 +1,6 @@
 # Provenance
+CUHacking 2026 Winner!!
+
 Provenance is a camera-to-chain photo authenticity system. Every photo is cryptographically signed **at the moment of capture** and anchored to the Solana blockchain — so anyone, anywhere, can later prove that an image is the real, unmodified original.
 
 Unlike AI-detector guesswork, Provenance never guesses. A photo either matches an unforgeable on-chain record, or it doesn't. It doesn't try to spot fakes — it **proves reals**.
