@@ -1,3 +1,4 @@
 node_modules/
 *fee-payer*.json
 .env
+.attest-key.json

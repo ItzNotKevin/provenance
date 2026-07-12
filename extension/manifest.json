@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Provenance — Verify Photo",
+  "version": "0.1.0",
+  "description": "Right-click any image on the web to check it against the Provenance on-chain registry (GREEN exact match / AMBER perceptual match / GREY no match).",
+  "permissions": ["contextMenus", "scripting"],
+  "host_permissions": ["<all_urls>", "http://localhost:8787/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Provenance",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

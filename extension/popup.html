@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        width: 260px;
+        margin: 0;
+        padding: 16px;
+        background: #0a0a0b;
+        color: #fafafa;
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        line-height: 1.55;
+      }
+      .wordmark {
+        font-size: 9px;
+        letter-spacing: 0.22em;
+        color: #71717a;
+        margin-bottom: 10px;
+      }
+      h1 {
+        font-size: 14px;
+        margin: 0 0 8px;
+        letter-spacing: 0.03em;
+      }
+      p {
+        font-size: 11px;
+        color: #a1a1aa;
+        margin: 0 0 10px;
+      }
+      .legend {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 12px;
+        border-top: 1px solid #27272a;
+        padding-top: 12px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 10px;
+        color: #a1a1aa;
+        letter-spacing: 0.06em;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex: none;
+      }
+      code {
+        color: #d4d4d8;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wordmark">PROVENANCE</div>
+    <h1>Verify a photo</h1>
+    <p>Right-click any image on the page and choose <strong>“Verify with Provenance.”</strong></p>
+    <p>Needs the local backend running on <code>:8787</code>.</p>
+    <div class="legend">
+      <div class="row"><span class="dot" style="background:#22c55e"></span>GREEN — exact chain match</div>
+      <div class="row"><span class="dot" style="background:#f59e0b"></span>AMBER — perceptual match</div>
+      <div class="row"><span class="dot" style="background:#71717a"></span>GREY — no match found</div>
+    </div>
+  </body>
+</html>

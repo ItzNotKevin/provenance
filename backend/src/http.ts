@@ -53,6 +53,10 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, {
     "Content-Type": "application/json",
     "Cache-Control": "no-store",
+    // Permissive CORS: the browser extension (and the verify-only web build) are cross-origin
+    // callers. Nothing here is authenticated or state-changing per-origin — reads are public
+    // chain data and /attest is signature-gated — so "*" is safe for this demo API.
+    "Access-Control-Allow-Origin": "*",
   });
   res.end(payload);
 }
@@ -334,6 +338,17 @@ async function handleVerify(
       let candidates: Awaited<ReturnType<typeof deps.findAmberCandidates>> = [];
       try {
         candidates = await deps.findAmberCandidates(effectivePhash, { limit: 5 });
+        // Opt-in distance diagnostic: set VERIFY_DEBUG=1 to log the closest attested candidate
+        // (even beyond the AMBER threshold), so a GREY can be explained as "no match" vs "far
+        // match" (e.g. an Instagram crop/letterbox at ~dist 22). Off by default — the extra
+        // unbounded search only runs when the flag is set.
+        if (process.env.VERIFY_DEBUG) {
+          const closest = await deps.findAmberCandidates(effectivePhash, { limit: 1, maxHammingDistance: 64 });
+          console.log(
+            `[verify-diag] queryPhash=${effectivePhash} withinThreshold=${candidates.length} ` +
+              `closest=${closest[0] ? `${closest[0].document.sha256.slice(0, 12)}@dist${closest[0].hammingDistance}` : "none"}`
+          );
+        }
       } catch (err) {
         if (!(err instanceof MongoNotConfiguredError)) throw err;
         // feature disabled — fall through to GREY rather than treating it as a failure
@@ -379,6 +394,19 @@ export function createRequestHandler(
     res.on("finish", () => {
       console.log(`[${requestId}] -> ${res.statusCode}`);
     });
+
+    // CORS preflight — the extension's JSON POST to /verify is a "non-simple" request, so the
+    // browser sends OPTIONS first. Answer it with the allowed methods/headers before routing.
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Max-Age": "86400",
+      });
+      res.end();
+      return;
+    }
 
     if (req.method === "POST" && url.pathname === "/attest") {
       void handleAttest(req, res, dependencies);
