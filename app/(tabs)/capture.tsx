@@ -249,7 +249,7 @@ function NativeCapture() {
             CAMERA ACCESS REQUIRED
           </Text>
           <Text className="font-sans text-sm text-on-surface-variant text-center">
-            VERIFY.SYSTEM needs the camera to sign photos at the moment of capture.
+            PROVENANCE needs the camera to sign photos at the moment of capture.
           </Text>
         </RegistrationFrame>
         <GhostButton label="GRANT CAMERA ACCESS" onPress={requestPermission} />

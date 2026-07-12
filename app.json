@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "verifysystem",
-    "slug": "verifysystem",
-    "scheme": "verifysystem",
+    "name": "provenance",
+    "slug": "provenance",
+    "scheme": "provenance",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -12,7 +12,7 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "VERIFY.SYSTEM uses the camera to capture and cryptographically sign photos at the moment of capture."
+        "NSCameraUsageDescription": "PROVENANCE uses the camera to capture and cryptographically sign photos at the moment of capture."
       }
     },
     "android": {
@@ -37,7 +37,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "VERIFY.SYSTEM uses the camera to capture and cryptographically sign photos at the moment of capture."
+          "cameraPermission": "PROVENANCE uses the camera to capture and cryptographically sign photos at the moment of capture."
         }
       ]
     ]

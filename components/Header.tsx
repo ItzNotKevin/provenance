@@ -1,16 +1,21 @@
-import { Text, View } from "react-native";
+import { Image, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-/** Shared top app bar: wordmark left. */
+/** Shared top app bar: logo + wordmark left. */
 export default function Header() {
   const insets = useSafeAreaInsets();
   return (
     <View
-      className="border-b border-hairline bg-surface justify-end px-4 pb-2"
+      className="flex-row items-center border-b border-hairline bg-surface px-4 pb-2 gap-2"
       style={{ paddingTop: insets.top + 8 }}
     >
+      <Image
+        source={require("../assets/logo.png")}
+        style={{ width: 18, height: 20 }}
+        resizeMode="contain"
+      />
       <Text className="font-mono-bold text-sm text-primary uppercase tracking-tighter">
-        <Text className="text-accent">◆</Text> VERIFY.SYSTEM
+        PROVENANCE
       </Text>
     </View>
   );
