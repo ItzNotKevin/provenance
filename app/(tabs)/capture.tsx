@@ -44,7 +44,7 @@ function WebFallback() {
   return (
     <View className="flex-1 items-center justify-center bg-background px-8">
       <RegistrationFrame className="border border-hairline bg-surface p-8 items-center gap-4">
-        <Text className="text-accent-red text-[32px]">◇</Text>
+        <Ionicons name="phone-portrait-outline" size={32} color="#fca5a5" />
         <Text className="font-mono-bold text-lg text-primary uppercase text-center tracking-widest">
           CAPTURE REQUIRES{"\n"}THE DEVICE APP
         </Text>
@@ -270,6 +270,7 @@ function NativeCapture() {
     return (
       <View className="flex-1 items-center justify-center bg-background px-8 gap-6">
         <RegistrationFrame className="border border-hairline bg-surface p-8 items-center gap-4">
+          <Ionicons name="camera-outline" size={32} color="#c4b5fd" />
           <Text className="font-mono-bold text-lg text-primary uppercase text-center tracking-widest">
             CAMERA ACCESS REQUIRED
           </Text>
@@ -277,7 +278,7 @@ function NativeCapture() {
             PROVENANCE needs the camera to sign photos at the moment of capture.
           </Text>
         </RegistrationFrame>
-        <GhostButton label="GRANT CAMERA ACCESS" onPress={requestPermission} />
+        <GhostButton label="GRANT CAMERA ACCESS" icon="camera-outline" onPress={requestPermission} />
       </View>
     );
   }
@@ -408,7 +409,7 @@ function NativeCapture() {
                 {label}
               </Text>
               {i < checklistStep && (
-                <Text className="font-mono text-xs text-verdict-green">✓</Text>
+                <Ionicons name="checkmark" size={14} color="#22c55e" />
               )}
             </View>
           ))}
@@ -437,18 +438,19 @@ function NativeCapture() {
             <Text className="font-mono-bold text-2xl text-verdict-green uppercase tracking-widest">
               ANCHORED
             </Text>
-            <View className="border-t border-hairline">
+            <View className="border border-hairline">
               <LedgerRow label="SHA-256" value={anchorResult.sha256} />
               <LedgerRow label="CAPTURED" value={anchorResult.timestamp} />
               <LedgerRow label="TRANSACTION" value={anchorResult.txSignature} last />
             </View>
             <GhostButton
-              label="VIEW ON EXPLORER ↗"
+              label="VIEW ON EXPLORER"
+              icon="open-outline"
               onPress={() => Linking.openURL(anchorResult.explorerUrl)}
             />
           </View>
         </View>
-        <GhostButton label="CAPTURE ANOTHER PHOTO" onPress={reset} />
+        <GhostButton label="CAPTURE ANOTHER PHOTO" icon="refresh" onPress={reset} />
       </ScrollView>
     );
   }

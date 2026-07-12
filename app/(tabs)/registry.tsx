@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Image, Keyboard, Pressable, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import RegistrationFrame from "@/components/RegistrationFrame";
 import { recentAttestations, type AttestationRecord } from "@/lib/registry";
 
@@ -31,7 +32,7 @@ export default function RegistryScreen() {
   return (
     <View className="flex-1 bg-background">
       <View className="px-4 pt-4">
-        <View className="flex-row items-center border-b border-hairline">
+        <View className="flex-row items-center border-b border-muted">
           <TextInput
             value={query}
             onChangeText={setQuery}
@@ -43,14 +44,14 @@ export default function RegistryScreen() {
             autoCorrect={false}
             returnKeyType="done"
             onSubmitEditing={() => Keyboard.dismiss()}
-            className="flex-1 px-1 py-3 font-mono text-xs text-primary uppercase"
+            className="flex-1 px-2 py-3 font-mono text-xs text-primary uppercase"
           />
           <Pressable
             onPress={() => Keyboard.dismiss()}
             hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
             className="px-2 py-2 active:opacity-60"
           >
-            <Text className="text-accent text-[18px]">⌕</Text>
+            <Ionicons name="search" size={16} color="#c4b5fd" />
           </Pressable>
         </View>
       </View>
@@ -74,7 +75,7 @@ export default function RegistryScreen() {
                   <Image source={{ uri: item.thumbnailUri }} className="w-full h-full" resizeMode="cover" />
                 ) : (
                   <View className="w-full h-full items-center justify-center">
-                    <Text className="text-on-surface-variant text-lg">◻</Text>
+                    <Ionicons name="image-outline" size={20} color="#8e9192" />
                   </View>
                 )}
               </RegistrationFrame>
@@ -84,9 +85,12 @@ export default function RegistryScreen() {
                     {truncateHash(item.sha256)}
                   </Text>
                   {item.txSignature && item.txSignature !== "unknown" ? (
-                    <Text className="font-mono text-[9px] text-accent-green uppercase tracking-wide mr-2">
-                      ✓ VERIFIED
-                    </Text>
+                    <View className="flex-row items-center gap-1 mr-2">
+                      <Ionicons name="checkmark-circle" size={10} color="#86efac" />
+                      <Text className="font-mono text-[9px] text-accent-green uppercase tracking-wide">
+                        VERIFIED
+                      </Text>
+                    </View>
                   ) : (
                     <Text className="font-mono text-[9px] text-accent-orange uppercase tracking-wide mr-2">
                       UNVERIFIED
@@ -96,9 +100,12 @@ export default function RegistryScreen() {
                 <Text className="font-mono text-[10px] text-on-surface">
                   {item.capturedAt}
                 </Text>
-                <Text className="font-mono text-[10px] text-on-surface-variant">
-                  ⌗ {item.devicePubkey}
-                </Text>
+                <View className="flex-row items-center gap-1">
+                  <Ionicons name="hardware-chip-outline" size={10} color="#a1a1aa" />
+                  <Text className="font-mono text-[10px] text-on-surface-variant">
+                    {item.devicePubkey}
+                  </Text>
+                </View>
               </View>
             </Pressable>
           )}

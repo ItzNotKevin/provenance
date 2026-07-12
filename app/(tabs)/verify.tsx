@@ -13,17 +13,19 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
+import { Ionicons } from "@expo/vector-icons";
 import RegistrationFrame from "@/components/RegistrationFrame";
 import VerdictView from "@/components/VerdictView";
+import TerminalLog from "@/components/TerminalLog";
 import { PrimaryButton } from "@/components/Buttons";
 import { sha256Bytes, lookupHash, type Verdict } from "@/lib/registry";
 
 type Phase = "idle" | "verifying" | "result";
 
 const STEPS = [
-  "computing SHA-256...",
-  "deriving registry address...",
-  "confirming on-chain...",
+  "Computing SHA-256",
+  "Deriving registry address",
+  "Confirming on-chain",
 ];
 
 function sleep(ms: number) {
@@ -172,13 +174,13 @@ export default function VerifyScreen() {
         <>
           <RegistrationFrame className="border border-hairline bg-surface/50 p-8 items-center justify-center gap-8 min-h-[360px]">
             <View className="items-center gap-4">
-              <Text className="text-primary text-[40px]">⌕</Text>
+              <Ionicons name="search-outline" size={40} color="#ffffff" />
               <Text className="font-mono-bold text-2xl text-primary uppercase tracking-widest text-center leading-tight mt-2">
                 VERIFY A{"\n"}PHOTO
               </Text>
             </View>
             <View className="w-full gap-4">
-              <PrimaryButton label="SELECT PHOTO" onPress={handleSelectPhoto} />
+              <PrimaryButton label="SELECT PHOTO" icon="image-outline" onPress={handleSelectPhoto} />
               {/* Morphing URL entry: + slides right and becomes GO, input fades in, cancel drops down */}
               <View
                 style={{ height: URL_ROW_H }}
@@ -209,7 +211,7 @@ export default function VerifyScreen() {
                     autoCapitalize="none"
                     autoCorrect={false}
                     returnKeyType="go"
-                    className="flex-1 border border-hairline px-3 font-mono text-xs text-primary"
+                    className="flex-1 border border-muted px-3.5 py-2 font-mono text-xs text-primary"
                     onSubmitEditing={handleSubmitUrl}
                   />
                 </Animated.View>
@@ -335,10 +337,11 @@ export default function VerifyScreen() {
               >
                 <Pressable
                   onPress={closeUrlEntry}
-                  className="w-full h-full border border-accent-red/40 bg-accent-red/10 items-center justify-center active:opacity-70"
+                  className="w-full h-full flex-row gap-2 border border-accent-red/40 bg-accent-red/10 items-center justify-center active:opacity-70"
                 >
+                  <Ionicons name="close" size={14} color="#fca5a5" />
                   <Text className="font-mono-medium text-xs text-accent-red uppercase tracking-widest">
-                    ✕ CANCEL URL ENTRY
+                    CANCEL URL ENTRY
                   </Text>
                 </Pressable>
               </Animated.View>
@@ -352,7 +355,7 @@ export default function VerifyScreen() {
           )}
 
           <View className="flex-row items-center justify-center gap-2 opacity-80">
-            <Text className="text-on-surface-variant text-xs">🔒</Text>
+            <Ionicons name="lock-closed-outline" size={12} color="#a1a1aa" />
             <Text className="font-sans text-xs text-on-surface-variant">
               Photos are checked, never published.
             </Text>
@@ -376,13 +379,14 @@ export default function VerifyScreen() {
             />
           </RegistrationFrame>
 
-          <View className="border border-hairline bg-surface p-4 gap-4">
-            <View className="flex-row items-center gap-3">
-              <ActivityIndicator color="#c4b5fd" />
-              <Text className="font-mono text-xs text-primary uppercase tracking-widest">
-                {STEPS[stepIndex]}
+          <View className="gap-2">
+            <View className="flex-row items-center justify-between">
+              <Text className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest">
+                Execution Sequence
               </Text>
+              <ActivityIndicator size="small" color="#c4b5fd" />
             </View>
+            <TerminalLog steps={STEPS} currentIndex={stepIndex} />
             <View className="w-full h-[2px] bg-surface-container-high">
               <View
                 className="h-full bg-accent"

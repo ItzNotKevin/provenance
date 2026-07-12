@@ -1,4 +1,5 @@
 import { Image, Linking, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import RegistrationFrame from "@/components/RegistrationFrame";
 import LedgerRow from "@/components/LedgerRow";
 import VerdictBlock from "@/components/VerdictBlock";
@@ -26,20 +27,22 @@ export default function VerdictView({
         )}
         <VerdictBlock
           tier="green"
-          headline="✓ CRYPTOGRAPHICALLY VERIFIED"
+          icon="checkmark-circle"
+          headline="CRYPTOGRAPHICALLY VERIFIED"
           subline="Exact match — unmodified since capture."
         />
-        <View className="border-t border-hairline">
+        <View className="border border-hairline">
           <LedgerRow label="SHA-256" value={r.sha256} />
           <LedgerRow label="CAPTURED" value={r.capturedAt} />
           <LedgerRow label="DEVICE KEY" value={r.devicePubkey} />
           <LedgerRow label="TRANSACTION" value={r.txSignature} last />
         </View>
         <GhostButton
-          label="VIEW ON SOLANA EXPLORER ↗"
+          label="VIEW ON SOLANA EXPLORER"
+          icon="open-outline"
           onPress={() => Linking.openURL(r.explorerUrl)}
         />
-        {onReset && <GhostButton label="VERIFY ANOTHER PHOTO" onPress={onReset} />}
+        {onReset && <GhostButton label="VERIFY ANOTHER PHOTO" icon="refresh" onPress={onReset} />}
       </View>
     );
   }
@@ -51,6 +54,7 @@ export default function VerdictView({
       <View className="gap-6">
         <VerdictBlock
           tier="amber"
+          icon="alert-circle"
           headline="MATCHES A VERIFIED CAPTURE"
           subline="Visually the same as an attested original, but the file has changed since capture — edited, re-encoded, or re-shared."
         />
@@ -72,41 +76,37 @@ export default function VerdictView({
             {distance !== undefined ? `${distance}/64 BITS` : "—"}
           </Text>
         </View>
-        <View className="border-t border-hairline">
+        <View className="border border-hairline">
           <LedgerRow label="SHA-256 (ATTESTED)" value={r.sha256} />
           <LedgerRow label="CAPTURED" value={r.capturedAt} />
           <LedgerRow label="DEVICE KEY" value={r.devicePubkey} />
           <LedgerRow label="TRANSACTION" value={r.txSignature} last />
         </View>
-        <View className="py-4 border-l-2 border-hairline pl-3 gap-1">
-          <Text className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wide">
-            The original image is never stored — only its cryptographic fingerprint lives on-chain.
-          </Text>
-          <Text className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wide opacity-70">
-            The match above is confirmed against that on-chain record.
-          </Text>
+        <View className="flex-row gap-3 py-4 border-l border-hairline pl-3">
+          <Ionicons name="information-circle-outline" size={16} color="#8e9192" style={{ marginTop: 1 }} />
+          <View className="flex-1 gap-1">
+            <Text className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wide">
+              The original image is never stored — only its cryptographic fingerprint lives on-chain.
+            </Text>
+            <Text className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wide opacity-70">
+              The match above is confirmed against that on-chain record.
+            </Text>
+          </View>
         </View>
-        {onReset && <GhostButton label="VERIFY ANOTHER PHOTO" onPress={onReset} />}
+        {onReset && <GhostButton label="VERIFY ANOTHER PHOTO" icon="refresh" onPress={onReset} />}
       </View>
     );
   }
 
   return (
     <View className="gap-6">
-      <RegistrationFrame className="border border-hairline bg-surface p-6 gap-4">
-        <View
-          className="absolute top-0 left-0 w-full"
-          style={{ height: 6, backgroundColor: "#27272a" }}
-        />
-        <Text className="font-mono-bold text-2xl text-primary uppercase mt-4">
-          NO ATTESTATION FOUND
-        </Text>
-        <Text className="font-sans text-sm text-on-surface-variant">
-          This image does not match any record in the registry. This is not a
-          judgment of authenticity.
-        </Text>
-        {onReset && <GhostButton label="↺ VERIFY ANOTHER PHOTO" onPress={onReset} />}
-      </RegistrationFrame>
+      <VerdictBlock
+        tier="grey"
+        icon="help-circle-outline"
+        headline="NO ATTESTATION FOUND"
+        subline="This image does not match any record in the registry. This is not a judgment of authenticity."
+      />
+      {onReset && <GhostButton label="VERIFY ANOTHER PHOTO" icon="refresh" onPress={onReset} />}
     </View>
   );
 }

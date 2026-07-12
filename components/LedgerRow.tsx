@@ -12,7 +12,7 @@ export default function LedgerRow({
 }) {
   return (
     <View
-      className={`w-full py-3 flex-col gap-1 ${
+      className={`w-full px-4 py-3 flex-col gap-1 ${
         last ? "" : "border-b border-hairline"
       }`}
     >

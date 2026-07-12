@@ -3,6 +3,7 @@ import { createMaterialTopTabNavigator } from "@react-navigation/material-top-ta
 import { withLayoutContext } from "expo-router";
 import { Animated, Text, View, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import Header from "@/components/Header";
 
 const { Navigator } = createMaterialTopTabNavigator();
@@ -10,10 +11,11 @@ const { Navigator } = createMaterialTopTabNavigator();
 // swipeable screens plus an animated `position` for the indicator.
 const MaterialTopTabs = withLayoutContext(Navigator);
 
-const TAB_ICON: Record<string, string> = {
-  capture: "◉",
-  verify: "⌕",
-  registry: "☰",
+type IoniconName = keyof typeof Ionicons.glyphMap;
+const TAB_ICON: Record<string, { active: IoniconName; inactive: IoniconName }> = {
+  capture: { active: "camera", inactive: "camera-outline" },
+  verify: { active: "search", inactive: "search-outline" },
+  registry: { active: "list", inactive: "list-outline" },
 };
 
 function TabBar({ state, descriptors, navigation, position }: any) {
@@ -75,13 +77,12 @@ function TabBar({ state, descriptors, navigation, position }: any) {
                 isFocused ? "bg-surface-container-low" : ""
               }`}
             >
-              <Text
-                className={`text-[18px] mb-1 ${
-                  isFocused ? "text-accent" : "text-on-surface-variant"
-                }`}
-              >
-                {TAB_ICON[route.name]}
-              </Text>
+              <Ionicons
+                name={isFocused ? TAB_ICON[route.name].active : TAB_ICON[route.name].inactive}
+                size={18}
+                color={isFocused ? "#c4b5fd" : "#8e9192"}
+                style={{ marginBottom: 4 }}
+              />
               <Text
                 className={`font-mono text-[9px] uppercase tracking-widest ${
                   isFocused ? "text-primary" : "text-on-surface-variant"

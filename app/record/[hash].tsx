@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import VerdictView from "@/components/VerdictView";
 import { recentAttestations, type AttestationRecord } from "@/lib/registry";
 
@@ -38,9 +39,10 @@ export default function RecordDetailScreen() {
         <Pressable
           onPress={goBack}
           hitSlop={{ top: 12, bottom: 12, left: 16, right: 24 }}
-          className="active:opacity-70 py-2 pr-6"
+          className="flex-row items-center gap-1 active:opacity-70 py-2 pr-6"
         >
-          <Text className="font-mono text-xs text-primary uppercase">‹ BACK</Text>
+          <Ionicons name="chevron-back" size={14} color="#ffffff" />
+          <Text className="font-mono text-xs text-primary uppercase">BACK</Text>
         </Pressable>
       </View>
 
