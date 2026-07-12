@@ -16,6 +16,9 @@ export interface AttestationRecord {
 export interface Verdict {
   tier: VerdictTier;
   record?: AttestationRecord;
+  /** AMBER only: Hamming distance (0–64 bits) between the submitted image's pHash and the
+   *  matched original's. Lower = closer. Undefined for green/grey. */
+  hammingDistance?: number;
 }
 
 function bytesToHex(bytes: Uint8Array): string {

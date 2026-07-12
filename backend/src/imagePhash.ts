@@ -11,12 +11,20 @@ export class ImageDecodeError extends Error {}
  * and every AMBER candidate is re-confirmed against the device-signed SHA-256 before display
  * — an unsigned/backend-computed pHash can never produce a false "verified".
  *
+ * `.rotate()` with no arguments auto-orients pixels to match the image's EXIF orientation tag
+ * before anything else runs. Without it, two visually-identical photos whose encoders chose to
+ * bake orientation differently (pixels pre-rotated vs. left as sensor-native + an EXIF tag —
+ * common between a phone camera's own capture and an edited re-export of the same photo) decode
+ * to very different raw pixel buffers, which pHash reads as a near-total mismatch — the same
+ * signature as a genuine 90° rotation, even though nothing about the picture actually changed.
+ *
  * `.ensureAlpha()` guarantees 4 interleaved channels regardless of the source format, matching
  * pHashFromRgba's RGBA indexing assumption (it reads i*4, i*4+1, i*4+2 and ignores alpha).
  */
 export async function computePhashFromImageBytes(bytes: Buffer): Promise<string> {
   try {
     const { data, info } = await sharp(bytes)
+      .rotate()
       .ensureAlpha()
       .raw()
       .toBuffer({ resolveWithObject: true });

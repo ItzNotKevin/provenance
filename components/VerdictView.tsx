@@ -46,12 +46,13 @@ export default function VerdictView({
 
   if (verdict.tier === "amber" && verdict.record) {
     const r = verdict.record;
+    const distance = verdict.hammingDistance;
     return (
       <View className="gap-6">
         <VerdictBlock
           tier="amber"
-          headline="CONSISTENT WITH VERIFIED CAPTURE"
-          subline="Appears to be a recompressed or resized version of an attested original."
+          headline="MATCHES A VERIFIED CAPTURE"
+          subline="Visually the same as an attested original, but the file has changed since capture — edited, re-encoded, or re-shared."
         />
         <View className="gap-2">
           <Text className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest border-b border-hairline pb-1">
@@ -67,21 +68,9 @@ export default function VerdictView({
           <Text className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest">
             PERCEPTUAL DISTANCE
           </Text>
-          <Text className="font-mono-bold text-xs text-verdict-amber">4/64 BITS</Text>
-        </View>
-        <View className="gap-2">
-          <Text className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest border-b border-hairline pb-1">
-            ATTESTED ORIGINAL
+          <Text className="font-mono-bold text-xs text-verdict-amber">
+            {distance !== undefined ? `${distance}/64 BITS` : "—"}
           </Text>
-          <RegistrationFrame className="border border-hairline bg-surface aspect-[4/3] w-full overflow-hidden">
-            {r.thumbnailUri ? (
-              <Image source={{ uri: r.thumbnailUri }} className="w-full h-full" resizeMode="cover" />
-            ) : (
-              <View className="w-full h-full items-center justify-center">
-                <Text className="text-on-surface-variant text-2xl">◻</Text>
-              </View>
-            )}
-          </RegistrationFrame>
         </View>
         <View className="border-t border-hairline">
           <LedgerRow label="SHA-256 (ATTESTED)" value={r.sha256} />
@@ -89,9 +78,12 @@ export default function VerdictView({
           <LedgerRow label="DEVICE KEY" value={r.devicePubkey} />
           <LedgerRow label="TRANSACTION" value={r.txSignature} last />
         </View>
-        <View className="py-4 border-l-2 border-hairline pl-3">
+        <View className="py-4 border-l-2 border-hairline pl-3 gap-1">
           <Text className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wide">
-            Pixel-exact verification not possible for this file.
+            The original image is never stored — only its cryptographic fingerprint lives on-chain.
+          </Text>
+          <Text className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wide opacity-70">
+            The match above is confirmed against that on-chain record.
           </Text>
         </View>
         {onReset && <GhostButton label="VERIFY ANOTHER PHOTO" onPress={onReset} />}

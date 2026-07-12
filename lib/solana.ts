@@ -107,7 +107,7 @@ async function tryBackendVerify(sha256Hex: string, imageBytes: Uint8Array): Prom
       txSignature: "unknown",
       explorerUrl: body.record.explorerUrl,
     };
-    return { tier: "amber", record };
+    return { tier: "amber", record, hammingDistance: body.hammingDistance };
   } catch {
     return null;
   }
