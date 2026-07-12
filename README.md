@@ -1,5 +1,6 @@
 # Provenance
-CUHacking 2026 Winner!!
+
+cuHacking (Carleton University Winner) 7 - MLH Best Use of MongoDB Atlas
 
 Provenance is a camera-to-chain photo authenticity system. Every photo is cryptographically signed **at the moment of capture** and anchored to the Solana blockchain — so anyone, anywhere, can later prove that an image is the real, unmodified original.
 
@@ -83,10 +84,3 @@ For the backend:
 - `SOLANA_RPC_URL` (default: public devnet endpoint; use a free Helius/QuickNode key to avoid rate limits)
 - `FEE_PAYER_KEYPAIR_PATH` or `FEE_PAYER_SECRET_KEY` — devnet fee-payer wallet
 - `PORT` (default `8787`)
-
-## Docs
-- [CLAUDE.md](CLAUDE.md) — what's real vs. faked, conventions, how to verify changes
-- [docs/PLAN.md](docs/PLAN.md) — full product brief: problem, architecture, pitch
-- [docs/ROADMAP.md](docs/ROADMAP.md) — dependency-ladder checklist + cut order
-- [lib/CLAUDE.md](lib/CLAUDE.md) — the app↔chain/backend seams
-- [extension/README.md](extension/README.md) — extension usage + demo notes
