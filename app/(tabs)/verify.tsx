@@ -361,7 +361,7 @@ export default function VerifyScreen() {
             </Text>
           </View>
 
-          <View className="mt-4 pt-4 border-t border-dashed border-hairline">
+          <View className="mt-4 pt-4 pb-4 px-2 border-t border-hairline">
             <Text className="font-mono text-[10px] text-accent uppercase text-center">
               VERIFICATION IS READ-ONLY · CAPTURE SIGNS WITH THIS DEVICE&apos;S KEY
             </Text>

@@ -14,7 +14,7 @@ import * as MediaLibrary from "expo-media-library";
 import { Ionicons } from "@expo/vector-icons";
 import RegistrationFrame from "@/components/RegistrationFrame";
 import LedgerRow from "@/components/LedgerRow";
-import { GhostButton } from "@/components/Buttons";
+import { AccentButton, GhostButton } from "@/components/Buttons";
 import { sha256Bytes, attestPhoto, type CaptureManifest } from "@/lib/registry";
 import { getDeviceIdentity, signManifest, truncatePubkey } from "@/lib/deviceKey";
 import { canonicalManifestBytes } from "@/lib/manifest";
@@ -278,7 +278,7 @@ function NativeCapture() {
             PROVENANCE needs the camera to sign photos at the moment of capture.
           </Text>
         </RegistrationFrame>
-        <GhostButton label="GRANT CAMERA ACCESS" icon="camera-outline" onPress={requestPermission} />
+        <AccentButton label="GRANT CAMERA ACCESS" icon="camera-outline" onPress={requestPermission} />
       </View>
     );
   }
@@ -443,7 +443,7 @@ function NativeCapture() {
               <LedgerRow label="CAPTURED" value={anchorResult.timestamp} />
               <LedgerRow label="TRANSACTION" value={anchorResult.txSignature} last />
             </View>
-            <GhostButton
+            <AccentButton
               label="VIEW ON EXPLORER"
               icon="open-outline"
               onPress={() => Linking.openURL(anchorResult.explorerUrl)}

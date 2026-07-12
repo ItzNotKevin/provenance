@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import RegistrationFrame from "@/components/RegistrationFrame";
 import LedgerRow from "@/components/LedgerRow";
 import VerdictBlock from "@/components/VerdictBlock";
-import { GhostButton } from "@/components/Buttons";
+import { AccentButton, GhostButton } from "@/components/Buttons";
 import type { Verdict } from "@/lib/registry";
 
 /** Renders the green / amber / grey verdict outcome for a verified image. */
@@ -37,7 +37,7 @@ export default function VerdictView({
           <LedgerRow label="DEVICE KEY" value={r.devicePubkey} />
           <LedgerRow label="TRANSACTION" value={r.txSignature} last />
         </View>
-        <GhostButton
+        <AccentButton
           label="VIEW ON SOLANA EXPLORER"
           icon="open-outline"
           onPress={() => Linking.openURL(r.explorerUrl)}
@@ -93,7 +93,7 @@ export default function VerdictView({
             </Text>
           </View>
         </View>
-        {onReset && <GhostButton label="VERIFY ANOTHER PHOTO" icon="refresh" onPress={onReset} />}
+        {onReset && <AccentButton label="VERIFY ANOTHER PHOTO" icon="refresh" onPress={onReset} />}
       </View>
     );
   }
@@ -106,7 +106,7 @@ export default function VerdictView({
         headline="NO ATTESTATION FOUND"
         subline="This image does not match any record in the registry. This is not a judgment of authenticity."
       />
-      {onReset && <GhostButton label="VERIFY ANOTHER PHOTO" icon="refresh" onPress={onReset} />}
+      {onReset && <AccentButton label="VERIFY ANOTHER PHOTO" icon="refresh" onPress={onReset} />}
     </View>
   );
 }
