@@ -226,13 +226,19 @@ export interface RecentPage {
 /**
  * Paginated, newest-first query for the registry list (backs recentAttestations() —
  * see lib/CLAUDE.md #3). `before` is an opaque cursor (the previous page's oldest
- * timestamp) so pagination stays stable even as new attestations land.
+ * timestamp) so pagination stays stable even as new attestations land. `device`
+ * scopes the list to one device's own attestations — the registry is a personal
+ * ledger, not a public feed of every capture on the network (see lib/CLAUDE.md).
  */
-export async function queryRecent(opts: { limit?: number; before?: number } = {}): Promise<RecentPage> {
+export async function queryRecent(
+  opts: { limit?: number; before?: number; device?: string } = {}
+): Promise<RecentPage> {
   const limit = Math.min(Math.max(opts.limit ?? 20, 1), 100);
   const col = await getCollection();
 
-  const filter = opts.before !== undefined ? { timestamp: { $lt: opts.before } } : {};
+  const filter: Record<string, unknown> = {};
+  if (opts.before !== undefined) filter.timestamp = { $lt: opts.before };
+  if (opts.device) filter.device = opts.device;
   const records = await col
     .find(filter)
     .sort({ timestamp: -1 })

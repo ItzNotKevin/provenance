@@ -135,12 +135,19 @@ interface RecentAttestationDocument {
  * a paginated read of the Mongo mirror (itself fully rebuildable from the chain — see
  * backend/scripts/reindex.ts). Every field traces back to a chain-confirmed read at index
  * time (see lib/CLAUDE.md's iron rule). Falls back to fake data when USE_FAKE_REGISTRY is set.
+ *
+ * The registry is a personal ledger, not a public feed: pass `devicePubkey` (hex) to scope
+ * the list to one device's own attestations. A global chronological feed of every capture on
+ * the network — timestamp + device identity, even without images — is itself a privacy leak
+ * (it lets anyone correlate a persistent device identity with when/how often it captures).
+ * Omitting it returns an unscoped page, which callers should not use for a public-facing list.
  */
-export async function recentAttestations(): Promise<AttestationRecord[]> {
+export async function recentAttestations(devicePubkey?: string): Promise<AttestationRecord[]> {
   if (!USE_FAKE_REGISTRY) {
     const { formatUnixSeconds } = await import("@/lib/verdict");
     const { CLUSTER_QUERY } = await import("@/lib/solanaConfig");
-    const response = await fetch(`${BACKEND_URL}/recent`);
+    const qs = devicePubkey ? `?device=${encodeURIComponent(devicePubkey)}` : "";
+    const response = await fetch(`${BACKEND_URL}/recent${qs}`);
     const body = await response.json();
     if (!response.ok) {
       throw new Error(body.error ?? `recent failed: HTTP ${response.status}`);

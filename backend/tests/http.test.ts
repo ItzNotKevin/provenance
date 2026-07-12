@@ -177,6 +177,23 @@ test("GET /recent returns the paginated mirror from queryRecent", async () => {
   assert.deepEqual(await response.json(), page);
 });
 
+test("GET /recent passes the device query param through to queryRecent (the registry is a personal ledger, not a public feed)", async () => {
+  let receivedDevice: string | undefined;
+  const page = { records: [RECENT_DOC], nextCursor: null };
+  const response = await get(
+    createRequestHandler({
+      queryRecent: async (opts) => {
+        receivedDevice = opts?.device;
+        return page;
+      },
+    }),
+    "/recent?device=abc123"
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(receivedDevice, "abc123");
+});
+
 test("GET /recent degrades to an empty page when Mongo isn't configured, instead of erroring", async () => {
   const response = await get(
     createRequestHandler({

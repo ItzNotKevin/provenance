@@ -256,10 +256,12 @@ async function handleRecent(
 ): Promise<void> {
   const limitParam = url.searchParams.get("limit");
   const beforeParam = url.searchParams.get("before");
+  const deviceParam = url.searchParams.get("device");
   try {
     const page = await deps.queryRecent({
       limit: limitParam ? Number(limitParam) : undefined,
       before: beforeParam ? Number(beforeParam) : undefined,
+      device: deviceParam ?? undefined,
     });
     sendJson(res, 200, page);
   } catch (err) {

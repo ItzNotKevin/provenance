@@ -3,7 +3,9 @@ import { ActivityIndicator, FlatList, Image, Keyboard, Pressable, Text, TextInpu
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import RegistrationFrame from "@/components/RegistrationFrame";
+import HashIdenticon from "@/components/HashIdenticon";
 import { recentAttestations, type AttestationRecord } from "@/lib/registry";
+import { getDeviceIdentity, truncatePubkey } from "@/lib/deviceKey";
 
 function truncateHash(hash: string): string {
   return `${hash.slice(0, 4)}…${hash.slice(-4)}`;
@@ -13,30 +15,41 @@ export default function RegistryScreen() {
   const router = useRouter();
   const [records, setRecords] = useState<AttestationRecord[] | null>(null);
   const [query, setQuery] = useState("");
+  const [pubkeyHex, setPubkeyHex] = useState<string>("");
 
   useEffect(() => {
-    recentAttestations().then(setRecords);
+    getDeviceIdentity().then((id) => {
+      setPubkeyHex(id.publicKeyHex);
+      recentAttestations(id.publicKeyHex).then(setRecords);
+    });
   }, []);
 
   const filtered = useMemo(() => {
     if (!records) return [];
     const q = query.trim().toLowerCase();
     if (!q) return records;
-    return records.filter(
-      (r) =>
-        r.sha256.toLowerCase().includes(q) ||
-        r.devicePubkey.toLowerCase().includes(q)
-    );
+    return records.filter((r) => r.sha256.toLowerCase().includes(q));
   }, [records, query]);
 
   return (
     <View className="flex-1 bg-background">
-      <View className="px-4 pt-4">
+      <View className="px-4 pt-4 gap-3">
+        <View className="gap-1">
+          <Text className="font-mono-bold text-lg text-primary uppercase tracking-widest">
+            My Attestations
+          </Text>
+          <View className="flex-row items-center gap-1.5">
+            <Ionicons name="hardware-chip-outline" size={11} color="#a1a1aa" />
+            <Text className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wide">
+              This device · {truncatePubkey(pubkeyHex)}
+            </Text>
+          </View>
+        </View>
         <View className="flex-row items-center border-b border-muted">
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="LOOK UP BY HASH OR DEVICE..."
+            placeholder="SEARCH BY HASH..."
             placeholderTextColor="#8e9192"
             cursorColor="#c4b5fd"
             selectionColor="#c4b5fd"
@@ -70,13 +83,11 @@ export default function RegistryScreen() {
               onPress={() => router.push(`/record/${item.sha256}`)}
               className="flex-row items-center py-3 border-b border-hairline active:opacity-70"
             >
-              <RegistrationFrame className="w-16 h-16 border border-hairline bg-surface-container mr-4 overflow-hidden">
+              <RegistrationFrame className="w-16 h-16 border border-hairline bg-surface-container mr-4 items-center justify-center overflow-hidden">
                 {item.thumbnailUri ? (
                   <Image source={{ uri: item.thumbnailUri }} className="w-full h-full" resizeMode="cover" />
                 ) : (
-                  <View className="w-full h-full items-center justify-center">
-                    <Ionicons name="image-outline" size={20} color="#8e9192" />
-                  </View>
+                  <HashIdenticon hash={item.sha256} size={52} />
                 )}
               </RegistrationFrame>
               <View className="flex-1 gap-1">
@@ -100,19 +111,14 @@ export default function RegistryScreen() {
                 <Text className="font-mono text-[10px] text-on-surface">
                   {item.capturedAt}
                 </Text>
-                <View className="flex-row items-center gap-1">
-                  <Ionicons name="hardware-chip-outline" size={10} color="#a1a1aa" />
-                  <Text className="font-mono text-[10px] text-on-surface-variant">
-                    {item.devicePubkey}
-                  </Text>
-                </View>
               </View>
             </Pressable>
           )}
           ListEmptyComponent={
-            <View className="items-center py-16">
-              <Text className="font-mono text-xs text-on-surface-variant uppercase">
-                No matching records.
+            <View className="items-center py-16 gap-2">
+              <Ionicons name="file-tray-outline" size={24} color="#8e9192" />
+              <Text className="font-mono text-xs text-on-surface-variant uppercase text-center">
+                {query ? "No matching records." : "No attestations from this device yet."}
               </Text>
             </View>
           }

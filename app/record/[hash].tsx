@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import VerdictView from "@/components/VerdictView";
 import { recentAttestations, type AttestationRecord } from "@/lib/registry";
+import { getDeviceIdentity } from "@/lib/deviceKey";
 
 export default function RecordDetailScreen() {
   const { hash } = useLocalSearchParams<{ hash: string }>();
@@ -13,9 +14,13 @@ export default function RecordDetailScreen() {
   const [record, setRecord] = useState<AttestationRecord | null | undefined>(undefined);
 
   useEffect(() => {
-    recentAttestations().then((records) => {
-      setRecord(records.find((r) => r.sha256 === hash) ?? null);
-    });
+    // Reached only from this device's own registry list (a personal ledger, not a
+    // public feed — see lib/CLAUDE.md), so the lookup stays scoped to this device.
+    getDeviceIdentity().then((id) =>
+      recentAttestations(id.publicKeyHex).then((records) => {
+        setRecord(records.find((r) => r.sha256 === hash) ?? null);
+      })
+    );
   }, [hash]);
 
   const goBack = () => {
