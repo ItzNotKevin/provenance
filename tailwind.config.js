@@ -26,6 +26,8 @@ module.exports = {
         "verdict-grey": "#71717a",
         accent: "#c4b5fd",
         "accent-red": "#fca5a5",
+        "accent-green": "#86efac",
+        "accent-orange": "#fdba74",
       },
       fontFamily: {
         mono: ["JetBrainsMono_400Regular"],

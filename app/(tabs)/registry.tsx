@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Image, Pressable, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, FlatList, Image, Keyboard, Pressable, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import RegistrationFrame from "@/components/RegistrationFrame";
 import { recentAttestations, type AttestationRecord } from "@/lib/registry";
@@ -31,17 +31,28 @@ export default function RegistryScreen() {
   return (
     <View className="flex-1 bg-background">
       <View className="px-4 pt-4">
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="LOOK UP BY HASH OR DEVICE..."
-          placeholderTextColor="#8e9192"
-          cursorColor="#c4b5fd"
-          selectionColor="#c4b5fd"
-          autoCapitalize="characters"
-          autoCorrect={false}
-          className="w-full border-b border-hairline px-1 py-3 font-mono text-xs text-primary uppercase"
-        />
+        <View className="flex-row items-center border-b border-hairline">
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="LOOK UP BY HASH OR DEVICE..."
+            placeholderTextColor="#8e9192"
+            cursorColor="#c4b5fd"
+            selectionColor="#c4b5fd"
+            autoCapitalize="characters"
+            autoCorrect={false}
+            returnKeyType="done"
+            onSubmitEditing={() => Keyboard.dismiss()}
+            className="flex-1 px-1 py-3 font-mono text-xs text-primary uppercase"
+          />
+          <Pressable
+            onPress={() => Keyboard.dismiss()}
+            hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+            className="px-2 py-2 active:opacity-60"
+          >
+            <Text className="text-accent text-[18px]">⌕</Text>
+          </Pressable>
+        </View>
       </View>
 
       {!records ? (
@@ -68,14 +79,25 @@ export default function RegistryScreen() {
                 )}
               </RegistrationFrame>
               <View className="flex-1 gap-1">
-                <Text className="font-mono text-xs text-on-surface">
-                  {truncateHash(item.sha256)}
-                </Text>
-                <Text className="font-mono text-[10px] text-on-surface-variant">
+                <View className="flex-row items-center justify-between">
+                  <Text className="font-mono-medium text-xs text-accent">
+                    {truncateHash(item.sha256)}
+                  </Text>
+                  {item.txSignature && item.txSignature !== "unknown" ? (
+                    <Text className="font-mono text-[9px] text-accent-green uppercase tracking-wide mr-2">
+                      ✓ VERIFIED
+                    </Text>
+                  ) : (
+                    <Text className="font-mono text-[9px] text-accent-orange uppercase tracking-wide mr-2">
+                      UNVERIFIED
+                    </Text>
+                  )}
+                </View>
+                <Text className="font-mono text-[10px] text-on-surface">
                   {item.capturedAt}
                 </Text>
                 <Text className="font-mono text-[10px] text-on-surface-variant">
-                  {item.devicePubkey}
+                  ⌗ {item.devicePubkey}
                 </Text>
               </View>
             </Pressable>

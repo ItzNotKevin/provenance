@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   Image,
+  Keyboard,
+  Pressable,
   ScrollView,
   Text,
   TextInput,
@@ -11,7 +15,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
 import RegistrationFrame from "@/components/RegistrationFrame";
 import VerdictView from "@/components/VerdictView";
-import { PrimaryButton, GhostButton } from "@/components/Buttons";
+import { PrimaryButton } from "@/components/Buttons";
 import { sha256Bytes, lookupHash, type Verdict } from "@/lib/registry";
 
 type Phase = "idle" | "verifying" | "result";
@@ -32,6 +36,9 @@ async function loadBytes(uri: string): Promise<Uint8Array> {
   return new Uint8Array(buffer);
 }
 
+const URL_BTN_W = 56;
+const URL_ROW_H = 48;
+
 export default function VerifyScreen() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [stepIndex, setStepIndex] = useState(0);
@@ -40,6 +47,33 @@ export default function VerifyScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showUrlField, setShowUrlField] = useState(false);
   const [urlValue, setUrlValue] = useState("");
+
+  // Morphing "+ → GO" URL entry (slide-over reveal)
+  const urlProgress = useRef(new Animated.Value(0)).current;
+  const [urlRowWidth, setUrlRowWidth] = useState(0);
+  const urlInputRef = useRef<TextInput>(null);
+
+  function openUrlEntry() {
+    setShowUrlField(true);
+    Animated.timing(urlProgress, {
+      toValue: 1,
+      duration: 450,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: false,
+    }).start(() => urlInputRef.current?.focus());
+  }
+
+  function closeUrlEntry() {
+    Keyboard.dismiss();
+    setShowUrlField(false);
+    setUrlValue("");
+    Animated.timing(urlProgress, {
+      toValue: 0,
+      duration: 400,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }
 
   /**
    * `displayUri` renders the preview (always safe — any URI works for <Image>).
@@ -126,6 +160,7 @@ export default function VerifyScreen() {
     setError(null);
     setShowUrlField(false);
     setUrlValue("");
+    urlProgress.setValue(0);
   }
 
   return (
@@ -144,30 +179,169 @@ export default function VerifyScreen() {
             </View>
             <View className="w-full gap-4">
               <PrimaryButton label="SELECT PHOTO" onPress={handleSelectPhoto} />
-              <GhostButton
-                label={showUrlField ? "CANCEL URL ENTRY" : "OR PASTE AN IMAGE URL"}
-                className="border-0 py-0"
-                onPress={() => setShowUrlField((v) => !v)}
-              />
-              {showUrlField && (
-                <View className="flex-row gap-2">
+              {/* Morphing URL entry: + slides right and becomes GO, input fades in, cancel drops down */}
+              <View
+                style={{ height: URL_ROW_H }}
+                className="w-full"
+                onLayout={(e) => setUrlRowWidth(e.nativeEvent.layout.width)}
+              >
+                {/* URL input, revealed as the button slides away */}
+                <Animated.View
+                  pointerEvents={showUrlField ? "auto" : "none"}
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: Math.max(0, urlRowWidth - URL_BTN_W - 8),
+                    opacity: urlProgress.interpolate({
+                      inputRange: [0, 0.5, 1],
+                      outputRange: [0, 0, 1],
+                    }),
+                  }}
+                >
                   <TextInput
+                    ref={urlInputRef}
                     value={urlValue}
                     onChangeText={setUrlValue}
                     placeholder="https://…"
                     placeholderTextColor="#8e9192"
                     autoCapitalize="none"
                     autoCorrect={false}
-                    className="flex-1 border border-hairline px-3 py-3 font-mono text-xs text-primary"
+                    returnKeyType="go"
+                    className="flex-1 border border-hairline px-3 font-mono text-xs text-primary"
                     onSubmitEditing={handleSubmitUrl}
                   />
-                  <PrimaryButton
-                    label="GO"
-                    className="w-16"
-                    onPress={handleSubmitUrl}
-                  />
-                </View>
-              )}
+                </Animated.View>
+
+                {/* Hint label, fades out on open */}
+                <Animated.View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    left: URL_BTN_W + 12,
+                    top: 0,
+                    bottom: 0,
+                    justifyContent: "center",
+                    opacity: urlProgress.interpolate({
+                      inputRange: [0, 0.4],
+                      outputRange: [1, 0],
+                      extrapolate: "clamp",
+                    }),
+                  }}
+                >
+                  <Text className="font-mono-medium text-xs text-on-surface-variant uppercase tracking-widest">
+                    OR PASTE AN IMAGE URL
+                  </Text>
+                </Animated.View>
+
+                {/* The sliding, morphing button */}
+                <Animated.View
+                  style={{
+                    width: URL_BTN_W,
+                    height: "100%",
+                    transform: [
+                      {
+                        translateX: urlProgress.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, Math.max(0, urlRowWidth - URL_BTN_W)],
+                        }),
+                      },
+                    ],
+                  }}
+                >
+                  <Pressable
+                    onPress={() => (showUrlField ? handleSubmitUrl() : openUrlEntry())}
+                    className="w-full h-full active:opacity-80"
+                  >
+                    <Animated.View
+                      style={{
+                        flex: 1,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderWidth: 1,
+                        backgroundColor: urlProgress.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ["#1c1b1c", "#ffffff"],
+                        }),
+                        borderColor: urlProgress.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ["#3f3f46", "#ffffff"],
+                        }),
+                      }}
+                    >
+                      <Animated.Text
+                        style={{
+                          position: "absolute",
+                          fontSize: 22,
+                          color: "#c4b5fd",
+                          opacity: urlProgress.interpolate({
+                            inputRange: [0, 0.5, 1],
+                            outputRange: [1, 0, 0],
+                          }),
+                          transform: [
+                            {
+                              rotate: urlProgress.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: ["0deg", "90deg"],
+                              }),
+                            },
+                          ],
+                        }}
+                      >
+                        +
+                      </Animated.Text>
+                      <Animated.Text
+                        style={{
+                          fontFamily: "JetBrainsMono_500Medium",
+                          fontSize: 11,
+                          letterSpacing: 1,
+                          color: "#0a0a0b",
+                          opacity: urlProgress.interpolate({
+                            inputRange: [0, 0.5, 1],
+                            outputRange: [0, 0, 1],
+                          }),
+                        }}
+                      >
+                        GO
+                      </Animated.Text>
+                    </Animated.View>
+                  </Pressable>
+                </Animated.View>
+              </View>
+
+              {/* Cancel slides down into view */}
+              <Animated.View
+                pointerEvents={showUrlField ? "auto" : "none"}
+                style={{
+                  overflow: "hidden",
+                  height: urlProgress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 44],
+                  }),
+                  opacity: urlProgress.interpolate({
+                    inputRange: [0, 0.6, 1],
+                    outputRange: [0, 0, 1],
+                  }),
+                  transform: [
+                    {
+                      translateY: urlProgress.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-8, 0],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <Pressable
+                  onPress={closeUrlEntry}
+                  className="w-full h-full border border-accent-red/40 bg-accent-red/10 items-center justify-center active:opacity-70"
+                >
+                  <Text className="font-mono-medium text-xs text-accent-red uppercase tracking-widest">
+                    ✕ CANCEL URL ENTRY
+                  </Text>
+                </Pressable>
+              </Animated.View>
             </View>
           </RegistrationFrame>
 
@@ -185,7 +359,7 @@ export default function VerifyScreen() {
           </View>
 
           <View className="mt-4 pt-4 border-t border-dashed border-hairline">
-            <Text className="font-mono text-[10px] text-on-surface-variant uppercase text-center opacity-70">
+            <Text className="font-mono text-[10px] text-accent uppercase text-center">
               VERIFICATION IS READ-ONLY · CAPTURE SIGNS WITH THIS DEVICE&apos;S KEY
             </Text>
           </View>

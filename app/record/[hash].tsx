@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import VerdictView from "@/components/VerdictView";
 import { recentAttestations, type AttestationRecord } from "@/lib/registry";
@@ -17,11 +17,30 @@ export default function RecordDetailScreen() {
     });
   }, [hash]);
 
+  const goBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)/registry");
+    }
+  };
+
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+      <Stack.Screen
+        options={{
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+          animation: "slide_from_right",
+        }}
+      />
       <View className="h-12 border-b border-hairline bg-surface flex-row items-center px-4">
-        <Pressable onPress={() => router.back()} className="active:opacity-70">
-          <Text className="font-mono text-xs text-primary uppercase active:text-accent">‹ BACK</Text>
+        <Pressable
+          onPress={goBack}
+          hitSlop={{ top: 12, bottom: 12, left: 16, right: 24 }}
+          className="active:opacity-70 py-2 pr-6"
+        >
+          <Text className="font-mono text-xs text-primary uppercase">‹ BACK</Text>
         </Pressable>
       </View>
 
