@@ -1,11 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Image, Keyboard, Pressable, Text, TextInput, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Keyboard,
+  Pressable,
+  RefreshControl,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import RegistrationFrame from "@/components/RegistrationFrame";
 import HashIdenticon from "@/components/HashIdenticon";
-import { recentAttestations, type AttestationRecord } from "@/lib/registry";
+import { recentAttestationsPage, type AttestationRecord } from "@/lib/registry";
 import { getDeviceIdentity, truncatePubkey } from "@/lib/deviceKey";
+
+const PAGE_SIZE = 20;
 
 function truncateHash(hash: string): string {
   return `${hash.slice(0, 4)}…${hash.slice(-4)}`;
@@ -16,13 +28,52 @@ export default function RegistryScreen() {
   const [records, setRecords] = useState<AttestationRecord[] | null>(null);
   const [query, setQuery] = useState("");
   const [pubkeyHex, setPubkeyHex] = useState<string>("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const cursorRef = useRef<string | null>(null);
+  const pubkeyRef = useRef<string>("");
 
-  useEffect(() => {
-    getDeviceIdentity().then((id) => {
-      setPubkeyHex(id.publicKeyHex);
-      recentAttestations(id.publicKeyHex).then(setRecords);
-    });
+  const loadFirstPage = useCallback(async () => {
+    const id = pubkeyRef.current || (await getDeviceIdentity()).publicKeyHex;
+    pubkeyRef.current = id;
+    setPubkeyHex(id);
+    const page = await recentAttestationsPage({ devicePubkey: id, limit: PAGE_SIZE });
+    cursorRef.current = page.nextCursor;
+    setRecords(page.records);
   }, []);
+
+  // Refetch whenever the Registry tab gains focus — e.g. right after capturing
+  // a photo — instead of only ever loading once on first mount.
+  useFocusEffect(
+    useCallback(() => {
+      loadFirstPage();
+    }, [loadFirstPage])
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadFirstPage();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadFirstPage]);
+
+  const onEndReached = useCallback(async () => {
+    if (loadingMore || !cursorRef.current || !pubkeyRef.current) return;
+    setLoadingMore(true);
+    try {
+      const page = await recentAttestationsPage({
+        devicePubkey: pubkeyRef.current,
+        before: cursorRef.current,
+        limit: PAGE_SIZE,
+      });
+      cursorRef.current = page.nextCursor;
+      setRecords((prev) => [...(prev ?? []), ...page.records]);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore]);
 
   const filtered = useMemo(() => {
     if (!records) return [];
@@ -78,6 +129,18 @@ export default function RegistryScreen() {
           data={filtered}
           keyExtractor={(item) => item.sha256}
           contentContainerClassName="px-4 pb-8"
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#c4b5fd" />
+          }
+          onEndReachedThreshold={0.4}
+          onEndReached={onEndReached}
+          ListFooterComponent={
+            loadingMore ? (
+              <View className="py-6 items-center">
+                <ActivityIndicator color="#c4b5fd" size="small" />
+              </View>
+            ) : null
+          }
           renderItem={({ item }) => (
             <Pressable
               onPress={() => router.push(`/record/${item.sha256}`)}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Share, Text, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import * as Linking from "expo-linking";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import VerdictView from "@/components/VerdictView";
@@ -31,6 +32,20 @@ export default function RecordDetailScreen() {
     }
   };
 
+  const shareProof = async () => {
+    if (!record) return;
+    const deepLink = Linking.createURL(`/record/${record.sha256}`);
+    await Share.share({
+      message: [
+        "PROVENANCE attestation",
+        `SHA-256: ${record.sha256}`,
+        `Captured: ${record.capturedAt}`,
+        `Verify: ${deepLink}`,
+        `Explorer: ${record.explorerUrl}`,
+      ].join("\n"),
+    });
+  };
+
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <Stack.Screen
@@ -40,7 +55,7 @@ export default function RecordDetailScreen() {
           animation: "slide_from_right",
         }}
       />
-      <View className="h-12 border-b border-hairline bg-surface flex-row items-center px-4">
+      <View className="h-12 border-b border-hairline bg-surface flex-row items-center justify-between px-4">
         <Pressable
           onPress={goBack}
           hitSlop={{ top: 12, bottom: 12, left: 16, right: 24 }}
@@ -49,6 +64,16 @@ export default function RecordDetailScreen() {
           <Ionicons name="chevron-back" size={14} color="#ffffff" />
           <Text className="font-mono text-xs text-primary uppercase">BACK</Text>
         </Pressable>
+        {record && (
+          <Pressable
+            onPress={shareProof}
+            hitSlop={{ top: 12, bottom: 12, left: 24, right: 16 }}
+            className="flex-row items-center gap-1.5 active:opacity-70 py-2 pl-6"
+          >
+            <Text className="font-mono text-xs text-accent uppercase">SHARE PROOF</Text>
+            <Ionicons name="share-outline" size={14} color="#c4b5fd" />
+          </Pressable>
+        )}
       </View>
 
       {record === undefined && (

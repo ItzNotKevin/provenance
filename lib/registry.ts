@@ -130,11 +130,18 @@ interface RecentAttestationDocument {
   explorerUrl: string;
 }
 
+export interface AttestationsPage {
+  records: AttestationRecord[];
+  /** Opaque cursor for the next page — pass back as `before`. Null when there's no more. */
+  nextCursor: string | null;
+}
+
 /**
- * Returns recent attestations for the registry list view. Real path: GET {BACKEND_URL}/recent,
- * a paginated read of the Mongo mirror (itself fully rebuildable from the chain — see
- * backend/scripts/reindex.ts). Every field traces back to a chain-confirmed read at index
- * time (see lib/CLAUDE.md's iron rule). Falls back to fake data when USE_FAKE_REGISTRY is set.
+ * Returns one page of recent attestations for the registry list view. Real path: GET
+ * {BACKEND_URL}/recent, a paginated read of the Mongo mirror (itself fully rebuildable from
+ * the chain — see backend/scripts/reindex.ts). Every field traces back to a chain-confirmed
+ * read at index time (see lib/CLAUDE.md's iron rule). Falls back to fake data (a single,
+ * un-paginated page) when USE_FAKE_REGISTRY is set.
  *
  * The registry is a personal ledger, not a public feed: pass `devicePubkey` (hex) to scope
  * the list to one device's own attestations. A global chronological feed of every capture on
@@ -142,30 +149,51 @@ interface RecentAttestationDocument {
  * (it lets anyone correlate a persistent device identity with when/how often it captures).
  * Omitting it returns an unscoped page, which callers should not use for a public-facing list.
  */
-export async function recentAttestations(devicePubkey?: string): Promise<AttestationRecord[]> {
+export async function recentAttestationsPage(
+  opts: { devicePubkey?: string; before?: string; limit?: number } = {}
+): Promise<AttestationsPage> {
   if (!USE_FAKE_REGISTRY) {
     const { formatUnixSeconds } = await import("@/lib/verdict");
     const { CLUSTER_QUERY } = await import("@/lib/solanaConfig");
-    const qs = devicePubkey ? `?device=${encodeURIComponent(devicePubkey)}` : "";
+    const params = new URLSearchParams();
+    if (opts.devicePubkey) params.set("device", opts.devicePubkey);
+    if (opts.before) params.set("before", opts.before);
+    if (opts.limit) params.set("limit", String(opts.limit));
+    const qs = params.toString() ? `?${params}` : "";
     const response = await fetch(`${BACKEND_URL}/recent${qs}`);
     const body = await response.json();
     if (!response.ok) {
       throw new Error(body.error ?? `recent failed: HTTP ${response.status}`);
     }
-    return (body.records as RecentAttestationDocument[]).map((doc) => ({
-      sha256: doc.sha256,
-      capturedAt: formatUnixSeconds(doc.timestamp),
-      devicePubkey: truncateKey(doc.device),
-      txSignature: doc.txSignature ? truncateKey(doc.txSignature) : "unknown",
-      explorerUrl: doc.txSignature
-        ? `https://explorer.solana.com/tx/${doc.txSignature}${CLUSTER_QUERY}`
-        : doc.explorerUrl,
-    }));
+    return {
+      records: (body.records as RecentAttestationDocument[]).map((doc) => ({
+        sha256: doc.sha256,
+        capturedAt: formatUnixSeconds(doc.timestamp),
+        devicePubkey: truncateKey(doc.device),
+        txSignature: doc.txSignature ? truncateKey(doc.txSignature) : "unknown",
+        explorerUrl: doc.txSignature
+          ? `https://explorer.solana.com/tx/${doc.txSignature}${CLUSTER_QUERY}`
+          : doc.explorerUrl,
+      })),
+      nextCursor: (body.nextCursor as string | null) ?? null,
+    };
   }
 
   await new Promise((resolve) => setTimeout(resolve, 400));
 
-  return [
+  return { records: FAKE_ATTESTATIONS, nextCursor: null };
+}
+
+/**
+ * Convenience wrapper over {@link recentAttestationsPage} for callers that just need to find
+ * one record by hash (e.g. record/[hash].tsx) rather than paginate a list.
+ */
+export async function recentAttestations(devicePubkey?: string): Promise<AttestationRecord[]> {
+  const page = await recentAttestationsPage({ devicePubkey, limit: 100 });
+  return page.records;
+}
+
+const FAKE_ATTESTATIONS: AttestationRecord[] = [
     {
       sha256:
         "8f3c2a91d47e6b05c1a9f2e8d3b7c4a65e90f1d2483b7a6c5d4e3f2a1b0c9d8e",
@@ -234,5 +262,4 @@ export async function recentAttestations(devicePubkey?: string): Promise<Attesta
       thumbnailUri:
         "https://lh3.googleusercontent.com/aida-public/AB6AXuA0R3XXtLGrB5rrC5we0Cw39znfxzzenLX_i7GYadGmeGQmROx4mEOnHMvQew91gwUAeYdeLvyEiX9_W9SPE5l4bPaZ8b9a1e7kLNO974P0rvvUXC-n1rFaQDVJSaJh_WcA422DyMaqq0xTRvYmYYuYg1Kllo-EL0jo9GFyv7IiMt6GkoQn6DMG8ro1aoGmkutaCXBJ6tgIohX0M17wf_CmlZjrkJZzto8YuobXCk2nWn3YQjwtc3Ht",
     },
-  ];
-}
+];
