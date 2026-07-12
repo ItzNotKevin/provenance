@@ -59,7 +59,7 @@ export default function VerdictView({
           subline="Visually the same as an attested original, but the file has changed since capture — edited, re-encoded, or re-shared."
         />
         <View className="gap-2">
-          <Text className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest border-b border-hairline pb-1">
+          <Text className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest border-b border-hairline pt-1 pb-1 px-4">
             SUBMITTED IMAGE
           </Text>
           <RegistrationFrame className="border border-hairline bg-surface aspect-[4/3] w-full overflow-hidden">
@@ -68,7 +68,7 @@ export default function VerdictView({
             )}
           </RegistrationFrame>
         </View>
-        <View className="flex-row items-center justify-between border-b border-hairline pb-2">
+        <View className="flex-row items-center justify-between border-b border-hairline pt-2 pb-2 px-4">
           <Text className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest">
             PERCEPTUAL DISTANCE
           </Text>
