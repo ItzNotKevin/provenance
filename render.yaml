@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: provenance-backend
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: node program/scripts/gen-idl.mjs && cd backend && npm install
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 22.19.0
+      - key: SOLANA_RPC_URL
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: FEE_PAYER_SECRET_KEY
+        sync: false
