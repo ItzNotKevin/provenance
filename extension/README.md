@@ -1,7 +1,14 @@
 # Provenance verify extension (Chrome, Manifest V3)
 
-Right-click any image on the web → **Verify with Provenance** → get a GREEN / AMBER / GREY
-verdict card, computed by the same backend `POST /verify` the mobile app uses.
+Two ways to verify, one backend:
+
+- **Badge scanner** — overlays a live GREEN / AMBER / GREY badge on every photo in a feed.
+  Auto-runs on the [demo feed](demo-feed/README.md); on any other page it's opt-in via the
+  popup's **SCAN THIS PAGE** toggle. Click a badge for the full verdict card.
+- **Right-click** any single image → **Verify with Provenance** → verdict card.
+
+Both are computed by the same backend the mobile app uses (`GET /lookup` for the exact-match
+chain read, `POST /verify` for the perceptual AMBER tier).
 
 This is the piece that makes the product's core claim tangible: a photo you attested at capture
 stays verifiable **even after Instagram/Twitter strip its metadata and re-encode it**. Because
@@ -29,12 +36,31 @@ No image is stored anywhere — same as the app, only hashes cross the wire.
 3. **Load unpacked** → select this `extension/` folder.
 4. Right-click any image on any page → **Verify with Provenance**.
 
+## Badge scanner (feed overlay)
+
+`badges.js` finds every feed-sized image (≥100px rendered), asks the worker for a verdict, and
+pins a floating badge to the image corner — repositioned live as you scroll, and picking up
+lazy-loaded posts via a MutationObserver. Verdicts are cached per URL in the worker with a
+concurrency cap of 4, and the GREEN check goes through `GET /lookup` first so exact matches
+never upload bytes at all. Fetch/verify failures render **no badge** — never a wrong verdict.
+
+It is deliberately opt-in per tab (nothing is scanned until you ask), with one exception: the
+[controlled demo feed](demo-feed/README.md) carries `<meta name="provenance-demo-feed">` and
+auto-enables, so the stage demo needs zero clicks.
+
 ## Demo script
+
+**Main demo (controlled feed):** stage GREEN + AMBER + GREY posts per
+[demo-feed/README.md](demo-feed/README.md), open `http://localhost:8788` — badges appear over
+the feed as it loads.
+
+**Stretch demo (real web):**
 
 1. Capture a photo in the app → it anchors on devnet (GREEN).
 2. Post that photo to Instagram (or anywhere on the web).
-3. Open it in the browser, right-click → **Verify with Provenance** → **AMBER**, matched to your
-   on-chain original, with the perceptual distance shown.
+3. Open the feed, click the extension icon → **SCAN THIS PAGE** → your repost badges **AMBER**
+   (matched to your on-chain original) while everything else shows UNVERIFIED. Or right-click a
+   single image → **Verify with Provenance**.
 
 ## Notes / limits
 

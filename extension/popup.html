@@ -53,17 +53,46 @@
       code {
         color: #d4d4d8;
       }
+      #scan {
+        width: 100%;
+        margin: 2px 0 12px;
+        padding: 9px 0;
+        background: #fafafa;
+        color: #0a0a0b;
+        border: none;
+        font-family: inherit;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        cursor: pointer;
+      }
+      #scan.on {
+        background: #22c55e;
+      }
+      #scan:disabled {
+        background: #27272a;
+        color: #71717a;
+        cursor: default;
+      }
+      #scan-hint {
+        font-size: 10px;
+        color: #71717a;
+        margin: -4px 0 10px;
+      }
     </style>
   </head>
   <body>
     <div class="wordmark">PROVENANCE</div>
-    <h1>Verify a photo</h1>
-    <p>Right-click any image on the page and choose <strong>“Verify with Provenance.”</strong></p>
+    <h1>Verify photos</h1>
+    <button id="scan">SCAN THIS PAGE</button>
+    <div id="scan-hint">Badges every photo in the feed.</div>
+    <p>Or right-click a single image and choose <strong>“Verify with Provenance.”</strong></p>
     <p>Needs the local backend running on <code>:8787</code>.</p>
     <div class="legend">
       <div class="row"><span class="dot" style="background:#22c55e"></span>GREEN — exact chain match</div>
       <div class="row"><span class="dot" style="background:#f59e0b"></span>AMBER — perceptual match</div>
       <div class="row"><span class="dot" style="background:#71717a"></span>GREY — no match found</div>
     </div>
+    <script src="popup.js"></script>
   </body>
 </html>

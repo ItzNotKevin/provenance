@@ -40,3 +40,5 @@ web-dev-server.log
 # generated native folders
 /ios
 /android
+.vercel
+.env*

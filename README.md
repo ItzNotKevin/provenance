@@ -33,14 +33,15 @@ Every verification returns exactly one of three honest answers — never a fake 
 - Browse recent attestations (hash, time, device, tx) with verified/unverified status badges; search by hash or device; tap into full record detail.
 
 ### 4) Browser extension (`extension/`)
-- A Chrome popup that verifies photos on any web page: Gemini triages the page's images to surface the one that matters (or you click-to-capture the exact image), then **CHECK** it against the registry or **VERIFY** it (demo attest).
+- **Badge scanner:** overlays a live GREEN / AMBER / GREY badge on every photo in a feed - auto-runs on the bundled Instagram-style demo feed (`extension/demo-feed/`), opt-in on any other page via the popup's **SCAN THIS PAGE** toggle. Click a badge for the full verdict card.
+- **Right-click** any single image → **Verify with Provenance** → the same GREEN / AMBER / GREY verdict card, with perceptual distance and a Solana Explorer link.
 
 ## Tech Stack
 - **App:** Expo (React Native) · expo-router · NativeWind · TypeScript
 - **Chain:** Solana devnet · Anchor (Rust) program · content-addressed PDAs (`["photo", sha256]`) · Ed25519 precompile verification (deployed program: `EoWdD…jZ8g`)
 - **Backend:** Node/TS · MongoDB Atlas + Atlas Vector Search (pHash ANN) · sharp (image decode)
 - **Crypto:** SHA-256 · Ed25519 (tweetnacl + expo-secure-store) · 64-bit DCT perceptual hash (our own implementation, shared across device/backend/web)
-- **Extension:** Chrome MV3 · Gemini Flash (image triage)
+- **Extension:** Chrome MV3 · feed badge overlay + right-click verify · zero-dependency demo feed server
 
 ## Local Setup
 ### App (Expo)
@@ -62,7 +63,7 @@ To rebuild: `cd program && ./build.sh` (see `program/README.md`; don't use `anch
 
 ### Chrome extension
 `chrome://extensions` → Developer mode → **Load unpacked** → select `extension/`.
-Optional: add a free Gemini API key (⚙ in the popup) for smart image filtering.
+Demo feed: `node extension/demo-feed/serve.mjs` → `http://localhost:8788` (see `extension/demo-feed/README.md` for staging GREEN/AMBER/GREY posts).
 
 ### Tests
 ```bash

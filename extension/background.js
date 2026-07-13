@@ -67,32 +67,91 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 async function verifyImage(srcUrl, tabId) {
   await showOverlay(tabId, { state: "loading" });
   try {
-    const bytes = await fetchImageBytes(srcUrl);
-    const sha256 = await sha256Hex(bytes);
-    const imageBase64 = arrayBufferToBase64(bytes);
-
-    const response = await fetch(`${BACKEND_URL}/verify`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sha256, imageBase64 }),
-    });
-    const body = await response.json();
-
-    // Both 200 (green/amber) and 404 (grey) carry a `tier`; treat anything else as an error.
-    if (!body || typeof body.tier !== "string") {
-      throw new Error(body?.error || `unexpected response (HTTP ${response.status})`);
-    }
-
-    await showOverlay(tabId, {
-      state: "result",
-      tier: body.tier,
-      hammingDistance: body.hammingDistance,
-      capturedAt: formatTimestamp(body.record?.timestamp),
-      explorerUrl: body.record?.explorerUrl || null,
-    });
+    await showOverlay(tabId, await computeVerdict(srcUrl));
   } catch (err) {
     await showOverlay(tabId, { state: "error", message: String(err?.message || err) });
   }
+}
+
+/**
+ * Verdict service for the badge scanner (content script `badges.js`). A feed page asks for a
+ * verdict per visible image, so unlike the one-shot context-menu path this needs a cache (the
+ * same CDN URL appears on every rescan) and a concurrency cap (don't fire 30 parallel
+ * fetch+verify calls the moment a feed loads).
+ */
+const verdictCache = new Map(); // srcUrl -> Promise<verdict>
+const MAX_CACHE = 300;
+const MAX_CONCURRENT = 4;
+let activeVerdicts = 0;
+const verdictQueue = [];
+
+async function withVerdictSlot(fn) {
+  if (activeVerdicts >= MAX_CONCURRENT) {
+    await new Promise((resolve) => verdictQueue.push(resolve));
+  }
+  activeVerdicts++;
+  try {
+    return await fn();
+  } finally {
+    activeVerdicts--;
+    verdictQueue.shift()?.();
+  }
+}
+
+function verdictForUrl(srcUrl) {
+  let pending = verdictCache.get(srcUrl);
+  if (!pending) {
+    if (verdictCache.size >= MAX_CACHE) verdictCache.clear();
+    pending = withVerdictSlot(() => computeVerdict(srcUrl));
+    // Don't cache failures (backend down, CDN 403) — a retry on the next scan should get a
+    // fresh chance rather than a memoized error.
+    pending.catch(() => verdictCache.delete(srcUrl));
+    verdictCache.set(srcUrl, pending);
+  }
+  return pending;
+}
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg?.type !== "provenance:verdict" || typeof msg.src !== "string") return;
+  verdictForUrl(msg.src).then(sendResponse, (err) =>
+    sendResponse({ state: "error", message: String(err?.message || err) })
+  );
+  return true; // async sendResponse
+});
+
+/**
+ * Fetch → SHA-256 → GET /lookup (cheap exact chain read, no upload) → only on a miss, POST
+ * /verify with the bytes so the backend can compute the pHash for the AMBER tier. The two-step
+ * order matters for feed scanning: GREEN images resolve with a ~zero-byte request instead of a
+ * base64 upload per image.
+ */
+async function computeVerdict(srcUrl) {
+  const bytes = await fetchImageBytes(srcUrl);
+  const sha256 = await sha256Hex(bytes);
+
+  const lookupRes = await fetch(`${BACKEND_URL}/lookup/${sha256}`);
+  let body = await lookupRes.json();
+  if (body?.tier !== "green") {
+    const verifyRes = await fetch(`${BACKEND_URL}/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sha256, imageBase64: arrayBufferToBase64(bytes) }),
+    });
+    body = await verifyRes.json();
+    // Both 200 (green/amber) and 404 (grey) carry a `tier`; treat anything else as an error.
+    if (!body || typeof body.tier !== "string") {
+      throw new Error(body?.error || `unexpected response (HTTP ${verifyRes.status})`);
+    }
+  }
+
+  return {
+    state: "result",
+    tier: body.tier,
+    sha256,
+    hammingDistance: body.hammingDistance,
+    capturedAt: formatTimestamp(body.record?.timestamp),
+    explorerUrl: body.record?.explorerUrl || null,
+  };
 }
 
 async function fetchImageBytes(srcUrl) {
