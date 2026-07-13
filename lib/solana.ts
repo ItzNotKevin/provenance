@@ -10,6 +10,12 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { hexToBytes, bytesToHex } from "@/lib/manifest";
 import { PROGRAM_ID, DEVNET_RPC_URL, CLUSTER_QUERY } from "@/lib/solanaConfig";
 import { BACKEND_URL, USE_FAKE_REGISTRY } from "@/lib/config";
+import {
+  amberVerdictFromVerifyResponse,
+  decodePhotoAttestation,
+  formatUnixSeconds,
+  truncateKey,
+} from "@/lib/verdict";
 import type { AttestationRecord, Verdict } from "@/lib/registry";
 
 const programId = new PublicKey(PROGRAM_ID);
@@ -24,58 +30,12 @@ function explorerTxUrl(signature: string): string {
   return `https://explorer.solana.com/tx/${signature}${CLUSTER_QUERY}`;
 }
 
-/** Formats unix seconds as "YYYY-MM-DD HH:MM:SS UTC", matching the rest of the app. */
-export function formatUnixSeconds(unixSeconds: number): string {
-  return new Date(unixSeconds * 1000).toISOString().replace("T", " ").slice(0, 19) + " UTC";
-}
-
 function deriveAttestationPda(sha256: Uint8Array): PublicKey {
   const [pda] = PublicKey.findProgramAddressSync(
     [new TextEncoder().encode("photo"), sha256],
     programId
   );
   return pda;
-}
-
-interface DecodedAttestation {
-  sha256: Uint8Array;
-  phash: bigint;
-  devicePubkey: Uint8Array;
-  timestamp: number;
-  slot: bigint;
-}
-
-/** Mirrors PhotoAttestation's field order in program/programs/provenance/src/lib.rs. */
-function decodePhotoAttestation(data: Buffer): DecodedAttestation {
-  let o = 8; // 8-byte Anchor account discriminator
-  const sha256 = new Uint8Array(data.subarray(o, o + 32));
-  o += 32;
-  const phash = data.readBigUInt64LE(o);
-  o += 8;
-  const devicePubkey = new Uint8Array(data.subarray(o, o + 32));
-  o += 32;
-  const timestamp = Number(data.readBigInt64LE(o));
-  o += 8;
-  const hasParent = data.readUInt8(o) === 1;
-  o += 1;
-  if (hasParent) o += 32; // parent_hash: not surfaced yet, skip past it
-  const slot = data.readBigUInt64LE(o);
-  return { sha256, phash, devicePubkey, timestamp, slot };
-}
-
-interface BackendVerifyResponse {
-  tier: "green" | "amber";
-  record: {
-    sha256: string;
-    devicePubkey: string;
-    timestamp: number;
-    explorerUrl: string;
-  };
-  hammingDistance?: number;
-}
-
-function truncateKey(hex: string): string {
-  return `${hex.slice(0, 4)}…${hex.slice(-4)}`;
 }
 
 /**
@@ -97,17 +57,7 @@ async function tryBackendVerify(sha256Hex: string, imageBytes: Uint8Array): Prom
       body: JSON.stringify({ sha256: sha256Hex, imageBase64: bytesToBase64(imageBytes) }),
     });
     if (!response.ok) return null;
-    const body: BackendVerifyResponse = await response.json();
-    if (body.tier !== "amber") return null;
-
-    const record: AttestationRecord = {
-      sha256: body.record.sha256,
-      capturedAt: formatUnixSeconds(body.record.timestamp),
-      devicePubkey: truncateKey(body.record.devicePubkey),
-      txSignature: "unknown",
-      explorerUrl: body.record.explorerUrl,
-    };
-    return { tier: "amber", record, hammingDistance: body.hammingDistance };
+    return amberVerdictFromVerifyResponse(await response.json());
   } catch {
     return null;
   }

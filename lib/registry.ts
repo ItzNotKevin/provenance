@@ -138,7 +138,7 @@ interface RecentAttestationDocument {
  */
 export async function recentAttestations(): Promise<AttestationRecord[]> {
   if (!USE_FAKE_REGISTRY) {
-    const { formatUnixSeconds } = await import("@/lib/solana");
+    const { formatUnixSeconds } = await import("@/lib/verdict");
     const { CLUSTER_QUERY } = await import("@/lib/solanaConfig");
     const response = await fetch(`${BACKEND_URL}/recent`);
     const body = await response.json();
