@@ -1,6 +1,8 @@
 # Provenance
 
-cuHacking 7 Winner - MLH Best Use of MongoDB Atlas
+> cuHacking 7 Winner - MLH Best Use of MongoDB Atlas
+
+https://github.com/user-attachments/assets/422f7c1c-a081-4fc8-adb1-6b64423282f1
 
 Provenance is a camera-to-chain photo authenticity system. Every photo is cryptographically signed **at the moment of capture** and anchored to the Solana blockchain - so anyone, anywhere, can later prove that an image is the real, unmodified original.
 
