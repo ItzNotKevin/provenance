@@ -1,4 +1,4 @@
-# Provenance
+# Provenance  <img src="/assets/logo.png" style="height: 38px; vertical-align: bottom;">
 
 > cuHacking 7 Winner - MLH Best Use of MongoDB Atlas
 
